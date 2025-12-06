@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflow Recorder</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #e8e8e8;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: #8892b0;
+      margin-bottom: 2rem;
+      font-size: 1.1rem;
+    }
+
+    .workflow-grid {
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .workflow-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+    }
+
+    .workflow-card:hover {
+      border-color: rgba(0, 217, 255, 0.3);
+      box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .workflow-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .workflow-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .workflow-id {
+      font-size: 0.75rem;
+      color: #00d9ff;
+      background: rgba(0, 217, 255, 0.1);
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .workflow-description {
+      color: #a8b2d1;
+      margin-bottom: 1rem;
+      line-height: 1.6;
+    }
+
+    .workflow-meta {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+
+    .workflow-meta span {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .steps-container {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+
+    .steps-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #00ff88;
+      margin-bottom: 0.75rem;
+    }
+
+    .step {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .step:last-child {
+      border-bottom: none;
+    }
+
+    .step-number {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #00d9ff, #00ff88);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #1a1a2e;
+      flex-shrink: 0;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-screen {
+      font-weight: 500;
+      color: #fff;
+      margin-bottom: 0.25rem;
+    }
+
+    .step-action {
+      font-size: 0.9rem;
+      color: #8892b0;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #6b7280;
+    }
+
+    .empty-state h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: #8892b0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 4rem;
+      color: #8892b0;
+    }
+
+    .loading::after {
+      content: '';
+      display: inline-block;
+      animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Workflow Recorder</h1>
+    <p class="subtitle">Captured workflows from your browsing sessions</p>
+    <div id="workflows" class="workflow-grid">
+      <div class="loading">Loading workflows</div>
+    </div>
+  </div>
+
+  <script>
+    async function loadWorkflows() {
+      const container = document.getElementById('workflows');
+
+      try {
+        const response = await fetch('/workflows');
+        const workflows = await response.json();
+
+        if (workflows.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <h2>No workflows yet</h2>
+              <p>Start recording by clicking around in your browser with the extension enabled, then click "Stop & Finalize" in the extension popup.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = workflows.map(workflow => {
+          const { id, sessionId, refinedJson, createdAt } = workflow;
+          const { name, description, steps } = refinedJson;
+          const date = new Date(createdAt).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          return `
+            <div class="workflow-card">
+              <div class="workflow-header">
+                <span class="workflow-name">${escapeHtml(name)}</span>
+                <span class="workflow-id">#${id}</span>
+              </div>
+              <p class="workflow-description">${escapeHtml(description)}</p>
+              <div class="workflow-meta">
+                <span>📅 ${date}</span>
+                <span>📋 ${steps.length} steps</span>
+                <span>🔗 ${sessionId.slice(0, 8)}...</span>
+              </div>
+              <div class="steps-container">
+                <div class="steps-title">Steps</div>
+                ${steps.map((step, i) => `
+                  <div class="step">
+                    <span class="step-number">${i + 1}</span>
+                    <div class="step-content">
+                      <div class="step-screen">${escapeHtml(step.screen)}</div>
+                      <div class="step-action">${escapeHtml(step.action)}</div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (error) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <h2>Error loading workflows</h2>
+            <p>${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    loadWorkflows();
+  </script>
+</body>
+</html>
+
+
