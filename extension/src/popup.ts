@@ -135,9 +135,10 @@ async function handleFinalize() {
     });
 
     // Show success message
-    const workflowCount = result.refined?.length || 0;
+    const templateCount = result.templates || 0;
+    const instanceCount = result.instances || 0;
     showMessage(
-      `Session finalized! ${workflowCount} workflow${workflowCount !== 1 ? "s" : ""} created.`,
+      `Done! ${templateCount} template${templateCount !== 1 ? "s" : ""}, ${instanceCount} instance${instanceCount !== 1 ? "s" : ""} created.`,
       "success"
     );
   } catch (error) {

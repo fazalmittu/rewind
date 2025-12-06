@@ -5,20 +5,13 @@ import path from "path";
 import livereload from "livereload";
 import connectLivereload from "connect-livereload";
 import {
-  insertEvent,
-  insertRawWorkflow,
-  insertRefinedWorkflow,
-  insertWorkflowMapping,
-  getAllRefinedWorkflows,
-  insertScreens,
-  insertSessionEvents,
   clearAllData,
+  getTemplatesWithInstances,
+  getAllCanonicalScreens,
 } from "./db";
 import { sessionStore } from "./sessionStore";
-import { classifyInteraction, extractUrlPattern } from "./classifier";
-import { segmentWorkflows } from "./workflowSegmenter";
-import { refineWorkflows } from "./workflowRefiner";
-import { IngestRequest, SessionEvent } from "./types";
+import { runFinalizationPipeline } from "./pipeline";
+import { IngestRequest, CapturedEvent } from "./types";
 
 export function createApp(): Express {
   const app = express();
@@ -27,8 +20,8 @@ export function createApp(): Express {
   app.use(cors());
   app.use(express.json({ limit: "50mb" }));
 
-  // Live reload in development
-  if (process.env.NODE_ENV !== "production") {
+  // Live reload in development (not during tests)
+  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
     const liveReloadServer = livereload.createServer();
     liveReloadServer.watch(path.join(__dirname, "..", "frontend"));
     liveReloadServer.server.once("connection", () => {
@@ -65,14 +58,17 @@ export function createApp(): Express {
     }
     res.json({
       sessionId: session.sessionId,
-      screenCount: session.knownScreens.length,
       eventCount: session.events.length,
-      screens: session.knownScreens,
+      events: session.events.map((e) => ({
+        type: e.eventType,
+        url: e.url,
+        action: e.actionSummary || e.targetText?.slice(0, 50),
+      })),
       createdAt: session.createdAt,
     });
   });
 
-  // Ingest endpoint - receives click events + screenshots from extension
+  // Ingest endpoint - receives events + screenshots from extension
   app.post("/ingest", async (req, res) => {
     try {
       const { payload, screenshot } = req.body as IngestRequest;
@@ -94,85 +90,29 @@ export function createApp(): Express {
       const base64Data = screenshot.replace(/^data:image\/png;base64,/, "");
       fs.writeFileSync(screenshotPath, base64Data, "base64");
 
-      // Get or create session state
-      const session = sessionStore.getOrCreate(payload.sessionId);
-
-      // Get previous state for comparison
-      const previousScreenId = session.lastScreenId;
-      const previousScreenLabel = previousScreenId
-        ? sessionStore.getScreenById(payload.sessionId, previousScreenId)?.label || null
-        : null;
-
-      // Classify this interaction
-      const classification = await classifyInteraction({
-        previousScreenshotPath: session.lastScreenshotPath,
-        currentScreenshotPath: screenshotPath,
-        previousUrl: session.lastUrl,
-        currentUrl: payload.url,
-        previousScreenId,
-        previousScreenLabel,
-        knownScreens: session.knownScreens,
-        clickX: payload.x,
-        clickY: payload.y,
-      });
-
-      console.log(`[Ingest] Classification result:`, JSON.stringify(classification, null, 2));
-
-      // Always update last screenshot (even for non-significant clicks)
-      sessionStore.updateLastScreenshot(payload.sessionId, screenshotPath, payload.url);
-
-      if (!classification.significant) {
-        // Non-significant click - don't record as event
-        console.log(`[Ingest] Non-significant click: ${classification.reason}`);
-        res.json({ 
-          status: "ok", 
-          significant: false, 
-          reason: classification.reason 
-        });
-        return;
-      }
-
-      // Significant click - determine screen
-      let screenId: string;
-      let screenLabel: string;
-
-      if (classification.screen!.isNew) {
-        // New screen - add to session
-        const newScreen = sessionStore.addScreen(payload.sessionId, {
-          label: classification.screen!.label!,
-          description: classification.screen!.description!,
-          urlPattern: extractUrlPattern(payload.url),
-          exampleScreenshotPath: relativeScreenshotPath,
-        });
-        screenId = newScreen.id;
-        screenLabel = newScreen.label;
-      } else {
-        // Existing screen - increment count
-        screenId = classification.screen!.matchedScreenId!;
-        sessionStore.incrementScreenCount(payload.sessionId, screenId);
-        screenLabel = sessionStore.getScreenById(payload.sessionId, screenId)?.label || "Unknown";
-      }
-
-      // Create and store event
-      const event: SessionEvent = {
+      // Create captured event
+      const event: CapturedEvent = {
         timestamp: payload.timestamp,
+        eventType: payload.eventType,
         url: payload.url,
-        screenId,
-        actionSummary: classification.action!,
         screenshotPath: relativeScreenshotPath,
-        clickX: payload.x,
-        clickY: payload.y,
+        targetTag: payload.targetTag,
+        targetText: payload.targetText,
+        clickX: payload.clickX,
+        clickY: payload.clickY,
+        inputValue: payload.inputValue,
+        inputName: payload.inputName,
+        inputLabel: payload.inputLabel,
+        inputType: payload.inputType,
       };
 
+      // Add to session store (classification happens at finalization)
       sessionStore.addEvent(payload.sessionId, event);
 
-      res.json({ 
-        status: "ok", 
-        significant: true,
-        screenId,
-        screenLabel,
-        action: classification.action,
-        isNewScreen: classification.screen!.isNew,
+      res.json({
+        status: "ok",
+        eventType: payload.eventType,
+        eventCount: sessionStore.getEvents(payload.sessionId).length,
       });
     } catch (error) {
       console.error("Ingest error:", error);
@@ -180,7 +120,7 @@ export function createApp(): Express {
     }
   });
 
-  // Finalize session - persists to DB, segments and refines workflows
+  // Finalize session - runs the full pipeline
   app.post("/finalize-session", async (req, res) => {
     try {
       const { sessionId } = req.body;
@@ -192,67 +132,32 @@ export function createApp(): Express {
 
       // Get session state
       const session = sessionStore.get(sessionId);
-      if (!session) {
-        res.json({ ok: true, raw: [], refined: [], message: "No active session found" });
-        return;
-      }
-
-      if (session.events.length === 0) {
+      if (!session || session.events.length === 0) {
         sessionStore.delete(sessionId);
-        res.json({ ok: true, raw: [], refined: [], message: "Session had no events" });
+        res.json({
+          ok: true,
+          message: "No events to process",
+          screens: [],
+          templates: [],
+          instances: [],
+        });
         return;
       }
 
-      console.log(`[Finalize] Session ${sessionId}: ${session.events.length} events, ${session.knownScreens.length} screens`);
+      console.log(`[Finalize] Processing session ${sessionId} with ${session.events.length} events`);
 
-      // Persist screens to database
-      await insertScreens(session.knownScreens, sessionId);
-
-      // Persist events to database
-      await insertSessionEvents(session.events, sessionId);
-
-      // Segment workflows using the session data
-      const raw = await segmentWorkflows(sessionId, session);
-
-      if (raw.length === 0) {
-        sessionStore.delete(sessionId);
-        res.json({ ok: true, raw: [], refined: [], message: "No workflows detected" });
-        return;
-      }
-
-      // Refine workflows via GPT
-      const refined = await refineWorkflows(raw);
-
-      // Store raw workflows and get their IDs
-      const rawIds: number[] = [];
-      for (const workflow of raw) {
-        const id = await insertRawWorkflow(sessionId, workflow);
-        rawIds.push(id);
-      }
-
-      // Store refined workflows and create mappings
-      const refinedIds: number[] = [];
-      for (const workflow of refined) {
-        const id = await insertRefinedWorkflow(sessionId, workflow);
-        refinedIds.push(id);
-      }
-
-      // Create mappings
-      for (const rawId of rawIds) {
-        for (const refinedId of refinedIds) {
-          await insertWorkflowMapping(rawId, refinedId);
-        }
-      }
+      // Run the finalization pipeline
+      const result = await runFinalizationPipeline(sessionId, session.events);
 
       // Clean up session from memory
       sessionStore.delete(sessionId);
 
-      res.json({ 
-        ok: true, 
-        raw, 
-        refined,
-        screensCount: session.knownScreens.length,
-        eventsCount: session.events.length,
+      res.json({
+        ok: true,
+        screens: result.screens.length,
+        templates: result.templates.length,
+        instances: result.instances.length,
+        data: result,
       });
     } catch (error) {
       console.error("Finalize error:", error);
@@ -260,14 +165,25 @@ export function createApp(): Express {
     }
   });
 
-  // Get all workflows
-  app.get("/workflows", async (_, res) => {
+  // Get all templates with their instances
+  app.get("/templates", async (_, res) => {
     try {
-      const workflows = await getAllRefinedWorkflows();
-      res.json(workflows);
+      const templates = await getTemplatesWithInstances();
+      res.json(templates);
     } catch (error) {
-      console.error("Get workflows error:", error);
-      res.status(500).json({ error: "Failed to get workflows" });
+      console.error("Get templates error:", error);
+      res.status(500).json({ error: "Failed to get templates" });
+    }
+  });
+
+  // Get all canonical screens
+  app.get("/screens", async (_, res) => {
+    try {
+      const screens = await getAllCanonicalScreens();
+      res.json(screens);
+    } catch (error) {
+      console.error("Get screens error:", error);
+      res.status(500).json({ error: "Failed to get screens" });
     }
   });
 
@@ -275,7 +191,6 @@ export function createApp(): Express {
   app.post("/reset", async (_, res) => {
     try {
       await clearAllData();
-      // Also clear any active sessions from memory
       sessionStore.clear();
       res.json({ ok: true, message: "All data cleared" });
     } catch (error) {

@@ -1,14 +1,15 @@
 import sqlite3 from "sqlite3";
 import path from "path";
 import {
-  RecordedEvent,
-  RawWorkflow,
-  RefinedWorkflow,
-  RawWorkflowRow,
-  RefinedWorkflowRow,
-  ScreenRow,
-  KnownScreen,
-  SessionEvent,
+  CanonicalScreen,
+  CanonicalScreenRow,
+  WorkflowTemplate,
+  WorkflowTemplateRow,
+  WorkflowInstance,
+  WorkflowInstanceRow,
+  TemplateStep,
+  ParameterDef,
+  StepSnapshot,
 } from "./types";
 
 sqlite3.verbose();
@@ -27,69 +28,52 @@ export const initDb = (dbPath?: string): Promise<void> => {
       }
 
       db.serialize(() => {
-        // Screens table - canonical screens identified during sessions
+        // Canonical screens table
         db.run(`
-          CREATE TABLE IF NOT EXISTS screens (
+          CREATE TABLE IF NOT EXISTS canonical_screens (
             id TEXT PRIMARY KEY,
-            sessionId TEXT NOT NULL,
             label TEXT NOT NULL,
             description TEXT NOT NULL,
-            urlPattern TEXT NOT NULL,
+            urlPatternsJson TEXT NOT NULL,
             exampleScreenshotPath TEXT NOT NULL,
-            seenCount INTEGER NOT NULL DEFAULT 1,
             createdAt INTEGER NOT NULL
           )
         `);
 
-        // Events table - with screenId reference
+        // Workflow templates table
         db.run(`
-          CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sessionId TEXT NOT NULL,
-            timestamp INTEGER NOT NULL,
-            url TEXT NOT NULL,
-            eventType TEXT NOT NULL,
-            screenshotPath TEXT NOT NULL,
-            screenId TEXT,
-            actionSummary TEXT NOT NULL,
-            screenSummary TEXT
+          CREATE TABLE IF NOT EXISTS workflow_templates (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            inputsJson TEXT NOT NULL,
+            outputsJson TEXT NOT NULL,
+            stepsJson TEXT NOT NULL,
+            createdAt INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL
           )
         `);
 
-        // Raw workflows table
-        db.run(`
-          CREATE TABLE IF NOT EXISTS raw_workflows (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sessionId TEXT NOT NULL,
-            workflowJson TEXT NOT NULL,
-            createdAt INTEGER NOT NULL
-          )
-        `);
-
-        // Refined workflows table
-        db.run(`
-          CREATE TABLE IF NOT EXISTS refined_workflows (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sessionId TEXT NOT NULL,
-            refinedJson TEXT NOT NULL,
-            createdAt INTEGER NOT NULL
-          )
-        `);
-
-        // Mapping table
+        // Workflow instances table
         db.run(
           `
-          CREATE TABLE IF NOT EXISTS refined_workflow_map (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            rawWorkflowId INTEGER NOT NULL,
-            refinedWorkflowId INTEGER NOT NULL,
-            FOREIGN KEY (rawWorkflowId) REFERENCES raw_workflows(id),
-            FOREIGN KEY (refinedWorkflowId) REFERENCES refined_workflows(id)
+          CREATE TABLE IF NOT EXISTS workflow_instances (
+            id TEXT PRIMARY KEY,
+            templateId TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            parameterValuesJson TEXT NOT NULL,
+            extractedValuesJson TEXT NOT NULL,
+            stepSnapshotsJson TEXT NOT NULL,
+            createdAt INTEGER NOT NULL,
+            FOREIGN KEY (templateId) REFERENCES workflow_templates(id)
           )
         `,
           (err) => {
             if (err) reject(err);
-            else resolve();
+            else {
+              console.log("[DB] Database initialized with new schema");
+              resolve();
+            }
           }
         );
       });
@@ -111,25 +95,23 @@ export const closeDb = (): Promise<void> => {
 };
 
 // ============================================
-// SCREEN OPERATIONS
+// CANONICAL SCREENS
 // ============================================
 
-export const insertScreen = (screen: KnownScreen, sessionId: string): Promise<void> => {
+export const insertCanonicalScreen = (screen: CanonicalScreen): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT OR REPLACE INTO screens (id, sessionId, label, description, urlPattern, exampleScreenshotPath, seenCount, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO canonical_screens (id, label, description, urlPatternsJson, exampleScreenshotPath, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         screen.id,
-        sessionId,
         screen.label,
         screen.description,
-        screen.urlPattern,
+        JSON.stringify(screen.urlPatterns),
         screen.exampleScreenshotPath,
-        screen.seenCount,
         Date.now(),
       ],
-      function (err) {
+      (err) => {
         if (err) reject(err);
         else resolve();
       }
@@ -137,196 +119,207 @@ export const insertScreen = (screen: KnownScreen, sessionId: string): Promise<vo
   });
 };
 
-export const insertScreens = async (screens: KnownScreen[], sessionId: string): Promise<void> => {
+export const insertCanonicalScreens = async (screens: CanonicalScreen[]): Promise<void> => {
   for (const screen of screens) {
-    await insertScreen(screen, sessionId);
+    await insertCanonicalScreen(screen);
   }
 };
 
-export const getScreenById = (screenId: string): Promise<ScreenRow | null> => {
+export const getAllCanonicalScreens = (): Promise<CanonicalScreen[]> => {
   return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT * FROM screens WHERE id = ?`,
-      [screenId],
-      (err, row) => {
-        if (err) reject(err);
-        else resolve((row as ScreenRow) || null);
+    db.all(`SELECT * FROM canonical_screens ORDER BY createdAt DESC`, [], (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
       }
-    );
-  });
-};
-
-export const getSessionScreens = (sessionId: string): Promise<ScreenRow[]> => {
-  return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM screens WHERE sessionId = ? ORDER BY createdAt ASC`,
-      [sessionId],
-      (err, rows) => {
-        if (err) reject(err);
-        else resolve((rows as ScreenRow[]) || []);
-      }
-    );
+      const screens = ((rows as CanonicalScreenRow[]) || []).map((row) => ({
+        id: row.id,
+        label: row.label,
+        description: row.description,
+        urlPatterns: JSON.parse(row.urlPatternsJson),
+        exampleScreenshotPath: row.exampleScreenshotPath,
+      }));
+      resolve(screens);
+    });
   });
 };
 
 // ============================================
-// EVENT OPERATIONS
+// WORKFLOW TEMPLATES
 // ============================================
 
-export const insertEvent = (
-  ev: Omit<RecordedEvent, "id">
-): Promise<number> => {
+export const insertWorkflowTemplate = (template: WorkflowTemplate): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT INTO events (sessionId, timestamp, url, eventType, screenshotPath, screenId, actionSummary, screenSummary)
+      `INSERT OR REPLACE INTO workflow_templates (id, name, description, inputsJson, outputsJson, stepsJson, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        ev.sessionId,
-        ev.timestamp,
-        ev.url,
-        ev.eventType,
-        ev.screenshotPath,
-        ev.screenId || null,
-        ev.actionSummary,
-        ev.screenSummary || null,
+        template.id,
+        template.name,
+        template.description,
+        JSON.stringify(template.inputs),
+        JSON.stringify(template.outputs),
+        JSON.stringify(template.steps),
+        template.createdAt,
+        template.updatedAt,
       ],
-      function (err) {
+      (err) => {
         if (err) reject(err);
-        else resolve(this.lastID);
+        else resolve();
       }
     );
   });
 };
 
-export const insertSessionEvents = async (
-  events: SessionEvent[],
-  sessionId: string
-): Promise<void> => {
-  for (const event of events) {
-    await insertEvent({
-      sessionId,
-      timestamp: event.timestamp,
-      url: event.url,
-      eventType: "click",
-      screenshotPath: event.screenshotPath,
-      screenId: event.screenId,
-      actionSummary: event.actionSummary,
-    });
+export const insertWorkflowTemplates = async (templates: WorkflowTemplate[]): Promise<void> => {
+  for (const template of templates) {
+    await insertWorkflowTemplate(template);
   }
 };
 
-export const getSessionEvents = (
-  sessionId: string
-): Promise<RecordedEvent[]> => {
+export const getAllWorkflowTemplates = (): Promise<WorkflowTemplate[]> => {
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT * FROM workflow_templates ORDER BY updatedAt DESC`, [], (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      const templates = ((rows as WorkflowTemplateRow[]) || []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        inputs: JSON.parse(row.inputsJson) as Record<string, ParameterDef>,
+        outputs: JSON.parse(row.outputsJson) as Record<string, ParameterDef>,
+        steps: JSON.parse(row.stepsJson) as TemplateStep[],
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      }));
+      resolve(templates);
+    });
+  });
+};
+
+export const getWorkflowTemplateById = (id: string): Promise<WorkflowTemplate | null> => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT * FROM workflow_templates WHERE id = ?`, [id], (err, row) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      if (!row) {
+        resolve(null);
+        return;
+      }
+      const r = row as WorkflowTemplateRow;
+      resolve({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        inputs: JSON.parse(r.inputsJson),
+        outputs: JSON.parse(r.outputsJson),
+        steps: JSON.parse(r.stepsJson),
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      });
+    });
+  });
+};
+
+// ============================================
+// WORKFLOW INSTANCES
+// ============================================
+
+export const insertWorkflowInstance = (instance: WorkflowInstance): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO workflow_instances (id, templateId, sessionId, parameterValuesJson, extractedValuesJson, stepSnapshotsJson, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        instance.id,
+        instance.templateId,
+        instance.sessionId,
+        JSON.stringify(instance.parameterValues),
+        JSON.stringify(instance.extractedValues),
+        JSON.stringify(instance.stepSnapshots),
+        instance.createdAt,
+      ],
+      (err) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+};
+
+export const insertWorkflowInstances = async (instances: WorkflowInstance[]): Promise<void> => {
+  for (const instance of instances) {
+    await insertWorkflowInstance(instance);
+  }
+};
+
+export const getAllWorkflowInstances = (): Promise<WorkflowInstance[]> => {
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT * FROM workflow_instances ORDER BY createdAt DESC`, [], (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      const instances = ((rows as WorkflowInstanceRow[]) || []).map((row) => ({
+        id: row.id,
+        templateId: row.templateId,
+        sessionId: row.sessionId,
+        parameterValues: JSON.parse(row.parameterValuesJson),
+        extractedValues: JSON.parse(row.extractedValuesJson),
+        stepSnapshots: JSON.parse(row.stepSnapshotsJson) as StepSnapshot[],
+        createdAt: row.createdAt,
+      }));
+      resolve(instances);
+    });
+  });
+};
+
+export const getInstancesByTemplateId = (templateId: string): Promise<WorkflowInstance[]> => {
   return new Promise((resolve, reject) => {
     db.all(
-      `SELECT * FROM events WHERE sessionId = ? ORDER BY timestamp ASC`,
-      [sessionId],
+      `SELECT * FROM workflow_instances WHERE templateId = ? ORDER BY createdAt DESC`,
+      [templateId],
       (err, rows) => {
-        if (err) reject(err);
-        else resolve((rows as RecordedEvent[]) || []);
+        if (err) {
+          reject(err);
+          return;
+        }
+        const instances = ((rows as WorkflowInstanceRow[]) || []).map((row) => ({
+          id: row.id,
+          templateId: row.templateId,
+          sessionId: row.sessionId,
+          parameterValues: JSON.parse(row.parameterValuesJson),
+          extractedValues: JSON.parse(row.extractedValuesJson),
+          stepSnapshots: JSON.parse(row.stepSnapshotsJson) as StepSnapshot[],
+          createdAt: row.createdAt,
+        }));
+        resolve(instances);
       }
     );
   });
 };
 
 // ============================================
-// WORKFLOW OPERATIONS
+// AGGREGATED QUERIES
 // ============================================
 
-export const insertRawWorkflow = (
-  sessionId: string,
-  workflow: RawWorkflow
-): Promise<number> => {
-  return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO raw_workflows (sessionId, workflowJson, createdAt)
-       VALUES (?, ?, ?)`,
-      [sessionId, JSON.stringify(workflow), Date.now()],
-      function (err) {
-        if (err) reject(err);
-        else resolve(this.lastID);
-      }
-    );
-  });
-};
+/**
+ * Get all templates with their instances
+ */
+export const getTemplatesWithInstances = async (): Promise<
+  Array<WorkflowTemplate & { instances: WorkflowInstance[] }>
+> => {
+  const templates = await getAllWorkflowTemplates();
+  const instances = await getAllWorkflowInstances();
 
-export const insertRefinedWorkflow = (
-  sessionId: string,
-  workflow: RefinedWorkflow
-): Promise<number> => {
-  return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO refined_workflows (sessionId, refinedJson, createdAt)
-       VALUES (?, ?, ?)`,
-      [sessionId, JSON.stringify(workflow), Date.now()],
-      function (err) {
-        if (err) reject(err);
-        else resolve(this.lastID);
-      }
-    );
-  });
-};
-
-export const insertWorkflowMapping = (
-  rawWorkflowId: number,
-  refinedWorkflowId: number
-): Promise<number> => {
-  return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO refined_workflow_map (rawWorkflowId, refinedWorkflowId)
-       VALUES (?, ?)`,
-      [rawWorkflowId, refinedWorkflowId],
-      function (err) {
-        if (err) reject(err);
-        else resolve(this.lastID);
-      }
-    );
-  });
-};
-
-export const getAllRefinedWorkflows = (): Promise<RefinedWorkflowRow[]> => {
-  return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM refined_workflows ORDER BY createdAt DESC`,
-      [],
-      (err, rows) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        const parsed = ((rows as any[]) || []).map((r) => ({
-          id: r.id,
-          sessionId: r.sessionId,
-          refinedJson: JSON.parse(r.refinedJson) as RefinedWorkflow,
-          createdAt: r.createdAt,
-        }));
-        resolve(parsed);
-      }
-    );
-  });
-};
-
-export const getRawWorkflows = (sessionId: string): Promise<RawWorkflowRow[]> => {
-  return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM raw_workflows WHERE sessionId = ? ORDER BY createdAt ASC`,
-      [sessionId],
-      (err, rows) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        const parsed = ((rows as any[]) || []).map((r) => ({
-          id: r.id,
-          sessionId: r.sessionId,
-          workflowJson: JSON.parse(r.workflowJson) as RawWorkflow,
-          createdAt: r.createdAt,
-        }));
-        resolve(parsed);
-      }
-    );
-  });
+  return templates.map((template) => ({
+    ...template,
+    instances: instances.filter((i) => i.templateId === template.id),
+  }));
 };
 
 // ============================================
@@ -336,67 +329,47 @@ export const getRawWorkflows = (sessionId: string): Promise<RawWorkflowRow[]> =>
 export const clearAllData = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
-      // Drop all tables (in correct order for foreign keys)
-      db.run(`DROP TABLE IF EXISTS refined_workflow_map`);
-      db.run(`DROP TABLE IF EXISTS refined_workflows`);
-      db.run(`DROP TABLE IF EXISTS raw_workflows`);
-      db.run(`DROP TABLE IF EXISTS events`);
-      db.run(`DROP TABLE IF EXISTS screens`);
+      // Drop all tables
+      db.run(`DROP TABLE IF EXISTS workflow_instances`);
+      db.run(`DROP TABLE IF EXISTS workflow_templates`);
+      db.run(`DROP TABLE IF EXISTS canonical_screens`);
 
-      // Recreate tables with current schema
+      // Recreate tables
       db.run(`
-        CREATE TABLE IF NOT EXISTS screens (
+        CREATE TABLE IF NOT EXISTS canonical_screens (
           id TEXT PRIMARY KEY,
-          sessionId TEXT NOT NULL,
           label TEXT NOT NULL,
           description TEXT NOT NULL,
-          urlPattern TEXT NOT NULL,
+          urlPatternsJson TEXT NOT NULL,
           exampleScreenshotPath TEXT NOT NULL,
-          seenCount INTEGER NOT NULL DEFAULT 1,
           createdAt INTEGER NOT NULL
         )
       `);
 
       db.run(`
-        CREATE TABLE IF NOT EXISTS events (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          sessionId TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          url TEXT NOT NULL,
-          eventType TEXT NOT NULL,
-          screenshotPath TEXT NOT NULL,
-          screenId TEXT,
-          actionSummary TEXT NOT NULL,
-          screenSummary TEXT
-        )
-      `);
-
-      db.run(`
-        CREATE TABLE IF NOT EXISTS raw_workflows (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          sessionId TEXT NOT NULL,
-          workflowJson TEXT NOT NULL,
-          createdAt INTEGER NOT NULL
-        )
-      `);
-
-      db.run(`
-        CREATE TABLE IF NOT EXISTS refined_workflows (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          sessionId TEXT NOT NULL,
-          refinedJson TEXT NOT NULL,
-          createdAt INTEGER NOT NULL
+        CREATE TABLE IF NOT EXISTS workflow_templates (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL,
+          inputsJson TEXT NOT NULL,
+          outputsJson TEXT NOT NULL,
+          stepsJson TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
         )
       `);
 
       db.run(
         `
-        CREATE TABLE IF NOT EXISTS refined_workflow_map (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          rawWorkflowId INTEGER NOT NULL,
-          refinedWorkflowId INTEGER NOT NULL,
-          FOREIGN KEY (rawWorkflowId) REFERENCES raw_workflows(id),
-          FOREIGN KEY (refinedWorkflowId) REFERENCES refined_workflows(id)
+        CREATE TABLE IF NOT EXISTS workflow_instances (
+          id TEXT PRIMARY KEY,
+          templateId TEXT NOT NULL,
+          sessionId TEXT NOT NULL,
+          parameterValuesJson TEXT NOT NULL,
+          extractedValuesJson TEXT NOT NULL,
+          stepSnapshotsJson TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          FOREIGN KEY (templateId) REFERENCES workflow_templates(id)
         )
       `,
         (err) => {

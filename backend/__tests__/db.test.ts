@@ -1,225 +1,310 @@
-import path from "path";
-import fs from "fs";
 import {
   initDb,
   closeDb,
-  insertEvent,
-  getSessionEvents,
-  insertRawWorkflow,
-  insertRefinedWorkflow,
-  insertWorkflowMapping,
-  getAllRefinedWorkflows,
-  getRawWorkflows,
-  insertScreen,
-  getSessionScreens,
+  clearAllData,
+  insertCanonicalScreen,
+  insertCanonicalScreens,
+  getAllCanonicalScreens,
+  insertWorkflowTemplate,
+  insertWorkflowTemplates,
+  getAllWorkflowTemplates,
+  getWorkflowTemplateById,
+  insertWorkflowInstance,
+  insertWorkflowInstances,
+  getAllWorkflowInstances,
+  getInstancesByTemplateId,
+  getTemplatesWithInstances,
 } from "../db";
-import { RawWorkflow, RefinedWorkflow, KnownScreen } from "../types";
+import {
+  CanonicalScreen,
+  WorkflowTemplate,
+  WorkflowInstance,
+} from "../types";
+import fs from "fs";
+import path from "path";
 
-// Use a unique test database for each test run
-const TEST_DB_PATH = path.join(__dirname, `test-${Date.now()}.db`);
+const TEST_DB_PATH = path.join(__dirname, "test.db");
 
-describe("Database", () => {
-  beforeAll(async () => {
-    await initDb(TEST_DB_PATH);
+beforeAll(async () => {
+  await initDb(TEST_DB_PATH);
+});
+
+afterAll(async () => {
+  await closeDb();
+  if (fs.existsSync(TEST_DB_PATH)) {
+    fs.unlinkSync(TEST_DB_PATH);
+  }
+});
+
+beforeEach(async () => {
+  await clearAllData();
+});
+
+describe("Canonical Screens", () => {
+  const testScreen: CanonicalScreen = {
+    id: "scr_test123",
+    label: "Product Detail Page",
+    description: "Page showing product details",
+    urlPatterns: ["/dp/*", "/product/*"],
+    exampleScreenshotPath: "storage/screenshots/123.png",
+  };
+
+  it("should insert and retrieve a canonical screen", async () => {
+    await insertCanonicalScreen(testScreen);
+    const screens = await getAllCanonicalScreens();
+
+    expect(screens).toHaveLength(1);
+    expect(screens[0].id).toBe(testScreen.id);
+    expect(screens[0].label).toBe(testScreen.label);
+    expect(screens[0].urlPatterns).toEqual(testScreen.urlPatterns);
   });
 
-  afterAll(async () => {
-    await closeDb();
-    // Clean up test database
-    if (fs.existsSync(TEST_DB_PATH)) {
-      fs.unlinkSync(TEST_DB_PATH);
-    }
+  it("should insert multiple screens", async () => {
+    const screens: CanonicalScreen[] = [
+      testScreen,
+      {
+        id: "scr_test456",
+        label: "Shopping Cart",
+        description: "Cart page",
+        urlPatterns: ["/cart"],
+        exampleScreenshotPath: "storage/screenshots/456.png",
+      },
+    ];
+
+    await insertCanonicalScreens(screens);
+    const result = await getAllCanonicalScreens();
+
+    expect(result).toHaveLength(2);
   });
 
-  describe("initDb", () => {
-    it("should create all required tables", async () => {
-      // If we got here without errors, tables were created
-      expect(true).toBe(true);
-    });
-  });
-
-  describe("screens", () => {
-    const testSessionId = "test-session-screens";
-
-    it("should insert and fetch screens", async () => {
-      const screen: KnownScreen = {
-        id: "scr_test123",
-        label: "Dashboard",
-        description: "Main dashboard screen",
-        urlPattern: "/dashboard",
-        exampleScreenshotPath: "screenshots/1.png",
-        seenCount: 3,
-      };
-
-      await insertScreen(screen, testSessionId);
-      const screens = await getSessionScreens(testSessionId);
-      
-      expect(screens.length).toBe(1);
-      expect(screens[0].label).toBe("Dashboard");
-      expect(screens[0].seenCount).toBe(3);
-    });
-  });
-
-  describe("events", () => {
-    const testSessionId = "test-session-events";
-
-    it("should insert an event and return its ID", async () => {
-      const event = {
-        sessionId: testSessionId,
-        timestamp: Date.now(),
-        url: "https://example.com",
-        eventType: "click" as const,
-        screenshotPath: "storage/screenshots/test.png",
-        screenId: "scr_abc123",
-        actionSummary: "Clicked a button",
-      };
-
-      const id = await insertEvent(event);
-      expect(typeof id).toBe("number");
-      expect(id).toBeGreaterThan(0);
+  it("should upsert screen on duplicate id", async () => {
+    await insertCanonicalScreen(testScreen);
+    await insertCanonicalScreen({
+      ...testScreen,
+      label: "Updated Label",
     });
 
-    it("should fetch events ordered by timestamp", async () => {
-      const baseTime = Date.now();
-
-      // Insert events in non-sequential order
-      await insertEvent({
-        sessionId: testSessionId,
-        timestamp: baseTime + 200,
-        url: "https://example.com/page2",
-        eventType: "click",
-        screenshotPath: "storage/screenshots/2.png",
-        screenId: "scr_page2",
-        actionSummary: "Action 2",
-      });
-
-      await insertEvent({
-        sessionId: testSessionId,
-        timestamp: baseTime + 100,
-        url: "https://example.com/page1",
-        eventType: "click",
-        screenshotPath: "storage/screenshots/1.png",
-        screenId: "scr_page1",
-        actionSummary: "Action 1",
-      });
-
-      const events = await getSessionEvents(testSessionId);
-      expect(events.length).toBeGreaterThanOrEqual(3);
-
-      // Verify ordering (timestamps should be ascending)
-      for (let i = 1; i < events.length; i++) {
-        expect(events[i].timestamp).toBeGreaterThanOrEqual(
-          events[i - 1].timestamp
-        );
-      }
-    });
-
-    it("should return empty array for non-existent session", async () => {
-      const events = await getSessionEvents("non-existent-session");
-      expect(events).toEqual([]);
-    });
-  });
-
-  describe("raw workflows", () => {
-    const testSessionId = "test-session-raw-workflows";
-
-    it("should insert a raw workflow and return its ID", async () => {
-      const workflow: RawWorkflow = {
-        steps: [
-          { screenId: "scr_dash", screenLabel: "Dashboard", action: "Clicked menu", screenshotPath: "1.png" },
-          { screenId: "scr_settings", screenLabel: "Settings", action: "Clicked save", screenshotPath: "2.png" },
-        ],
-      };
-
-      const id = await insertRawWorkflow(testSessionId, workflow);
-      expect(typeof id).toBe("number");
-      expect(id).toBeGreaterThan(0);
-    });
-
-    it("should fetch raw workflows for a session", async () => {
-      const workflows = await getRawWorkflows(testSessionId);
-      expect(workflows.length).toBeGreaterThan(0);
-      expect(workflows[0].workflowJson.steps).toBeDefined();
-      expect(workflows[0].workflowJson.steps.length).toBe(2);
-    });
-  });
-
-  describe("refined workflows", () => {
-    const testSessionId = "test-session-refined-workflows";
-
-    it("should insert a refined workflow and return its ID", async () => {
-      const workflow: RefinedWorkflow = {
-        name: "Update Settings",
-        description: "User navigates to settings and saves changes",
-        steps: [
-          { screenId: "scr_dash", screenLabel: "Dashboard", action: "Clicked settings icon", screenshotPath: "1.png" },
-          { screenId: "scr_settings", screenLabel: "Settings Page", action: "Updated preferences", screenshotPath: "2.png" },
-          { screenId: "scr_settings", screenLabel: "Settings Page", action: "Clicked save button", screenshotPath: "3.png" },
-        ],
-      };
-
-      const id = await insertRefinedWorkflow(testSessionId, workflow);
-      expect(typeof id).toBe("number");
-      expect(id).toBeGreaterThan(0);
-    });
-
-    it("should fetch all refined workflows", async () => {
-      const workflows = await getAllRefinedWorkflows();
-      expect(workflows.length).toBeGreaterThan(0);
-
-      const found = workflows.find((w) => w.sessionId === testSessionId);
-      expect(found).toBeDefined();
-      expect(found?.refinedJson.name).toBe("Update Settings");
-      expect(found?.refinedJson.steps.length).toBe(3);
-    });
-  });
-
-  describe("workflow mappings", () => {
-    const testSessionId = "test-session-mappings";
-
-    it("should create mappings between raw and refined workflows", async () => {
-      // Create raw workflow
-      const raw: RawWorkflow = {
-        steps: [{ screenId: "scr_home", screenLabel: "Home", action: "Click", screenshotPath: "1.png" }],
-      };
-      const rawId = await insertRawWorkflow(testSessionId, raw);
-
-      // Create refined workflow
-      const refined: RefinedWorkflow = {
-        name: "Test Flow",
-        description: "A test workflow",
-        steps: [{ screenId: "scr_home", screenLabel: "Home", action: "Click", screenshotPath: "1.png" }],
-      };
-      const refinedId = await insertRefinedWorkflow(testSessionId, refined);
-
-      // Create mapping
-      const mappingId = await insertWorkflowMapping(rawId, refinedId);
-      expect(typeof mappingId).toBe("number");
-      expect(mappingId).toBeGreaterThan(0);
-    });
-
-    it("should allow multiple raw workflows to map to one refined workflow", async () => {
-      const raw1: RawWorkflow = { steps: [{ screenId: "scr_a", screenLabel: "A", action: "1", screenshotPath: "1.png" }] };
-      const raw2: RawWorkflow = { steps: [{ screenId: "scr_b", screenLabel: "B", action: "2", screenshotPath: "2.png" }] };
-      const refined: RefinedWorkflow = {
-        name: "Merged Flow",
-        description: "Merged from two raw workflows",
-        steps: [
-          { screenId: "scr_a", screenLabel: "A", action: "1", screenshotPath: "1.png" },
-          { screenId: "scr_b", screenLabel: "B", action: "2", screenshotPath: "2.png" },
-        ],
-      };
-
-      const rawId1 = await insertRawWorkflow(testSessionId, raw1);
-      const rawId2 = await insertRawWorkflow(testSessionId, raw2);
-      const refinedId = await insertRefinedWorkflow(testSessionId, refined);
-
-      const mappingId1 = await insertWorkflowMapping(rawId1, refinedId);
-      const mappingId2 = await insertWorkflowMapping(rawId2, refinedId);
-
-      expect(mappingId1).toBeGreaterThan(0);
-      expect(mappingId2).toBeGreaterThan(0);
-      expect(mappingId2).not.toBe(mappingId1);
-    });
+    const screens = await getAllCanonicalScreens();
+    expect(screens).toHaveLength(1);
+    expect(screens[0].label).toBe("Updated Label");
   });
 });
+
+describe("Workflow Templates", () => {
+  const testTemplate: WorkflowTemplate = {
+    id: "tmpl_test123",
+    name: "Search and Add to Cart",
+    description: "Search for a product and add it to cart",
+    inputs: {
+      search_query: {
+        type: "string",
+        description: "The search term",
+        required: true,
+        observedValues: ["iPad", "iPhone"],
+      },
+      quantity: {
+        type: "number",
+        description: "Number of items",
+        required: false,
+        default: 1,
+        observedValues: [1, 2, 3],
+      },
+    },
+    outputs: {
+      product_name: {
+        type: "string",
+        description: "Name of product added",
+        required: false,
+        observedValues: ["iPad Pro"],
+      },
+    },
+    steps: [
+      {
+        stepNumber: 1,
+        screenPattern: "Search Results",
+        actionTemplate: "Enter {search_query} in search box",
+        usesInputs: ["search_query"],
+        extracts: {},
+      },
+      {
+        stepNumber: 2,
+        screenPattern: "Product Detail Page",
+        actionTemplate: "Click Add to Cart",
+        usesInputs: [],
+        extracts: {
+          product_name: { from: "page_content" },
+        },
+      },
+    ],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  it("should insert and retrieve a template", async () => {
+    await insertWorkflowTemplate(testTemplate);
+    const templates = await getAllWorkflowTemplates();
+
+    expect(templates).toHaveLength(1);
+    expect(templates[0].name).toBe(testTemplate.name);
+    expect(templates[0].inputs.search_query.type).toBe("string");
+    expect(templates[0].steps).toHaveLength(2);
+  });
+
+  it("should get template by id", async () => {
+    await insertWorkflowTemplate(testTemplate);
+    const template = await getWorkflowTemplateById(testTemplate.id);
+
+    expect(template).not.toBeNull();
+    expect(template?.name).toBe(testTemplate.name);
+  });
+
+  it("should return null for non-existent template", async () => {
+    const template = await getWorkflowTemplateById("non_existent");
+    expect(template).toBeNull();
+  });
+});
+
+describe("Workflow Instances", () => {
+  const templateId = "tmpl_parent";
+  const testInstance: WorkflowInstance = {
+    id: "inst_test123",
+    templateId,
+    sessionId: "session_abc",
+    parameterValues: {
+      search_query: "iPad",
+      quantity: 2,
+    },
+    extractedValues: {
+      product_name: "iPad Pro 11-inch",
+    },
+    stepSnapshots: [
+      {
+        stepNumber: 1,
+        screenshotPath: "storage/screenshots/1.png",
+        action: "Entered iPad in search",
+        screenLabel: "Search Results",
+      },
+      {
+        stepNumber: 2,
+        screenshotPath: "storage/screenshots/2.png",
+        action: "Clicked Add to Cart",
+        screenLabel: "Product Detail Page",
+      },
+    ],
+    createdAt: Date.now(),
+  };
+
+  beforeEach(async () => {
+    // Insert parent template first
+    await insertWorkflowTemplate({
+      id: templateId,
+      name: "Test Template",
+      description: "Test",
+      inputs: {},
+      outputs: {},
+      steps: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  });
+
+  it("should insert and retrieve an instance", async () => {
+    await insertWorkflowInstance(testInstance);
+    const instances = await getAllWorkflowInstances();
+
+    expect(instances).toHaveLength(1);
+    expect(instances[0].parameterValues.search_query).toBe("iPad");
+    expect(instances[0].stepSnapshots).toHaveLength(2);
+  });
+
+  it("should get instances by template id", async () => {
+    await insertWorkflowInstance(testInstance);
+    await insertWorkflowInstance({
+      ...testInstance,
+      id: "inst_test456",
+      parameterValues: { search_query: "iPhone" },
+    });
+
+    const instances = await getInstancesByTemplateId(templateId);
+    expect(instances).toHaveLength(2);
+  });
+
+  it("should return empty array for template with no instances", async () => {
+    const instances = await getInstancesByTemplateId("non_existent");
+    expect(instances).toHaveLength(0);
+  });
+});
+
+describe("Aggregated Queries", () => {
+  it("should get templates with their instances", async () => {
+    const template: WorkflowTemplate = {
+      id: "tmpl_agg",
+      name: "Aggregated Template",
+      description: "Test",
+      inputs: {},
+      outputs: {},
+      steps: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await insertWorkflowTemplate(template);
+    await insertWorkflowInstance({
+      id: "inst_1",
+      templateId: template.id,
+      sessionId: "sess_1",
+      parameterValues: { query: "test1" },
+      extractedValues: {},
+      stepSnapshots: [],
+      createdAt: Date.now(),
+    });
+    await insertWorkflowInstance({
+      id: "inst_2",
+      templateId: template.id,
+      sessionId: "sess_2",
+      parameterValues: { query: "test2" },
+      extractedValues: {},
+      stepSnapshots: [],
+      createdAt: Date.now(),
+    });
+
+    const result = await getTemplatesWithInstances();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].instances).toHaveLength(2);
+    expect(result[0].name).toBe("Aggregated Template");
+  });
+});
+
+describe("Clear All Data", () => {
+  it("should clear all tables", async () => {
+    await insertCanonicalScreen({
+      id: "scr_1",
+      label: "Test",
+      description: "Test",
+      urlPatterns: [],
+      exampleScreenshotPath: "",
+    });
+    await insertWorkflowTemplate({
+      id: "tmpl_1",
+      name: "Test",
+      description: "Test",
+      inputs: {},
+      outputs: {},
+      steps: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    await clearAllData();
+
+    const screens = await getAllCanonicalScreens();
+    const templates = await getAllWorkflowTemplates();
+    const instances = await getAllWorkflowInstances();
+
+    expect(screens).toHaveLength(0);
+    expect(templates).toHaveLength(0);
+    expect(instances).toHaveLength(0);
+  });
+});
+

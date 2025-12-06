@@ -1,154 +1,250 @@
 // ============================================
-// SCREEN & SESSION TYPES (In-Memory During Recording)
+// CAPTURED EVENTS (Raw data from extension)
 // ============================================
 
 /**
- * A canonical screen identified during the session.
- * Built up as we observe more interactions.
+ * Event types we capture from the browser
  */
-export interface KnownScreen {
-  id: string;                    // UUID generated when first seen
-  label: string;                 // e.g., "Dashboard", "Patient List"
-  description: string;           // e.g., "Main application dashboard with metrics"
-  urlPattern: string;            // URL path pattern, e.g., "/dashboard"
-  exampleScreenshotPath: string; // First screenshot where we saw this screen
-  seenCount: number;             // How many times we've seen this screen
-}
+export type EventType = "click" | "input" | "change" | "submit";
 
 /**
- * An event recorded during the session (before DB persistence).
- * References screens by ID rather than raw strings.
+ * Raw event captured by the extension
  */
-export interface SessionEvent {
+export interface CapturedEvent {
   timestamp: number;
+  eventType: EventType;
   url: string;
-  screenId: string;              // References KnownScreen.id
-  actionSummary: string;
   screenshotPath: string;
+  
+  // Click data
   clickX?: number;
   clickY?: number;
+  targetTag: string;
+  targetText?: string;
+  
+  // Input/Change data
+  inputValue?: string;
+  inputName?: string;
+  inputLabel?: string;
+  inputType?: string;
+  
+  // Added during classification
+  significant?: boolean;
+  screenId?: string;
+  actionSummary?: string;
+}
+
+// ============================================
+// CANONICAL SCREENS
+// ============================================
+
+/**
+ * A canonical screen type (e.g., "Product Detail Page")
+ * Multiple specific screens map to one canonical screen
+ */
+export interface CanonicalScreen {
+  id: string;
+  label: string;              // Generic label: "Product Detail Page"
+  description: string;
+  urlPatterns: string[];      // Patterns that match this screen
+  exampleScreenshotPath: string;
+}
+
+// ============================================
+// WORKFLOW TEMPLATES
+// ============================================
+
+/**
+ * Parameter definition for workflow inputs/outputs
+ */
+export interface ParameterDef {
+  type: "string" | "number" | "boolean";
+  description: string;
+  required: boolean;
+  default?: any;
+  observedValues: any[];      // Values seen across instances
 }
 
 /**
- * In-memory state for an active recording session.
- * Persisted to DB only on finalization.
+ * Extraction definition - how to pull data from a step
+ */
+export interface ExtractionDef {
+  from: "clicked_text" | "input_value" | "url_param" | "page_content";
+  description?: string;
+}
+
+/**
+ * A step in a workflow template
+ */
+export interface TemplateStep {
+  stepNumber: number;
+  screenPattern: string;      // Canonical screen type
+  actionTemplate: string;     // Template with {placeholders}
+  usesInputs: string[];       // Which input params this step uses
+  extracts: Record<string, ExtractionDef>;  // What this step extracts
+}
+
+/**
+ * A reusable workflow template
+ */
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string;
+  inputs: Record<string, ParameterDef>;
+  outputs: Record<string, ParameterDef>;
+  steps: TemplateStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+// ============================================
+// WORKFLOW INSTANCES
+// ============================================
+
+/**
+ * A snapshot of a step as it was executed
+ */
+export interface StepSnapshot {
+  stepNumber: number;
+  screenshotPath: string;
+  action: string;             // Actual action taken (not template)
+  screenLabel: string;
+}
+
+/**
+ * A specific execution of a workflow template
+ */
+export interface WorkflowInstance {
+  id: string;
+  templateId: string;
+  sessionId: string;
+  parameterValues: Record<string, any>;   // Actual input values
+  extractedValues: Record<string, any>;   // Values extracted during execution
+  stepSnapshots: StepSnapshot[];
+  createdAt: number;
+}
+
+// ============================================
+// SESSION STATE (In-memory during recording)
+// ============================================
+
+/**
+ * In-memory state for an active recording session
  */
 export interface SessionState {
   sessionId: string;
-  knownScreens: KnownScreen[];
-  events: SessionEvent[];
-  lastScreenshotPath: string | null;
-  lastScreenId: string | null;
-  lastUrl: string | null;
+  events: CapturedEvent[];
   createdAt: number;
 }
 
-/**
- * Result from the unified classification GPT call.
- */
-export interface ClassificationResult {
-  significant: boolean;
-  reason?: string;  // If not significant, explains why
-  
-  // Only present if significant:
-  screen?: {
-    isNew: boolean;
-    matchedScreenId?: string;   // If matched existing screen
-    label?: string;             // If new screen
-    description?: string;       // If new screen
-  };
-  action?: string;              // Description of what the user did
-}
-
 // ============================================
-// DATABASE TYPES (Persisted)
+// PIPELINE TYPES (Used during finalization)
 // ============================================
 
 /**
- * A screen stored in the database (persisted after finalization).
+ * Result of screen canonicalization
  */
-export interface ScreenRow {
-  id: string;
-  sessionId: string;
-  label: string;
-  description: string;
-  urlPattern: string;
-  exampleScreenshotPath: string;
-  seenCount: number;
-  createdAt: number;
+export interface CanonicalizeResult {
+  screens: CanonicalScreen[];
+  eventScreenMappings: Map<number, string>;  // eventIndex -> screenId
 }
 
 /**
- * An event stored in the database.
+ * A detected workflow instance (before template generation)
  */
-export interface RecordedEvent {
-  id?: number;
-  sessionId: string;
-  timestamp: number;
-  url: string;
-  eventType: "click";
-  screenshotPath: string;
-  screenId: string;              // References screen
-  actionSummary: string;
-  // Legacy field for backwards compatibility
-  screenSummary?: string;
+export interface DetectedInstance {
+  goal: string;
+  startEventIndex: number;
+  endEventIndex: number;
+  succeeded: boolean;
+  events: CapturedEvent[];
 }
 
-// ============================================
-// WORKFLOW TYPES
-// ============================================
-
-export interface WorkflowStep {
-  screenId: string;
-  screenLabel: string;           // Denormalized for display
-  action: string;
-  screenshotPath: string;
+/**
+ * Result of instance segmentation
+ */
+export interface SegmentationResult {
+  instances: DetectedInstance[];
 }
 
-export interface RawWorkflow {
-  steps: WorkflowStep[];
+/**
+ * Result of template synthesis for one instance
+ */
+export interface SynthesisResult {
+  template: WorkflowTemplate;
+  instance: WorkflowInstance;
 }
 
-export interface RefinedWorkflow {
-  name: string;
-  description: string;
-  steps: WorkflowStep[];
-}
-
-export interface RawWorkflowRow {
-  id?: number;
-  sessionId: string;
-  workflowJson: RawWorkflow;
-  createdAt: number;
-}
-
-export interface RefinedWorkflowRow {
-  id?: number;
-  sessionId: string;
-  refinedJson: RefinedWorkflow;
-  createdAt: number;
-}
-
-export interface WorkflowMapping {
-  id?: number;
-  rawWorkflowId: number;
-  refinedWorkflowId: number;
+/**
+ * Complete result of finalization pipeline
+ */
+export interface FinalizationResult {
+  screens: CanonicalScreen[];
+  templates: WorkflowTemplate[];
+  instances: WorkflowInstance[];
 }
 
 // ============================================
 // API PAYLOAD TYPES
 // ============================================
 
+/**
+ * Payload from extension for /ingest
+ */
 export interface IngestPayload {
   sessionId: string;
   timestamp: number;
   url: string;
-  eventType: "click";
-  x?: number;
-  y?: number;
+  eventType: EventType;
+  targetTag: string;
+  targetText?: string;
+  clickX?: number;
+  clickY?: number;
+  inputValue?: string;
+  inputName?: string;
+  inputLabel?: string;
+  inputType?: string;
 }
 
+/**
+ * Request body for /ingest
+ */
 export interface IngestRequest {
   payload: IngestPayload;
   screenshot: string;  // Base64 data URL
+}
+
+// ============================================
+// DATABASE ROW TYPES
+// ============================================
+
+export interface CanonicalScreenRow {
+  id: string;
+  label: string;
+  description: string;
+  urlPatternsJson: string;
+  exampleScreenshotPath: string;
+  createdAt: number;
+}
+
+export interface WorkflowTemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  inputsJson: string;
+  outputsJson: string;
+  stepsJson: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WorkflowInstanceRow {
+  id: string;
+  templateId: string;
+  sessionId: string;
+  parameterValuesJson: string;
+  extractedValuesJson: string;
+  stepSnapshotsJson: string;
+  createdAt: number;
 }

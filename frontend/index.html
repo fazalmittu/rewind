@@ -36,16 +36,73 @@
 
     .subtitle {
       color: #8892b0;
-      margin-bottom: 2rem;
+      margin-bottom: 0.5rem;
       font-size: 1.1rem;
     }
 
-    .workflow-grid {
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .header-left { flex: 1; }
+
+    .header-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00d9ff, #00ff88);
+      color: #1a1a2e;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
+    }
+
+    .btn-danger {
+      background: rgba(255, 77, 77, 0.1);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 77, 77, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 77, 77, 0.2);
+    }
+
+    .stats {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-top: 0.5rem;
+    }
+
+    /* Template Cards */
+    .template-grid {
       display: grid;
       gap: 1.5rem;
     }
 
-    .workflow-card {
+    .template-card {
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 16px;
@@ -54,57 +111,94 @@
       transition: all 0.3s ease;
     }
 
-    .workflow-card:hover {
+    .template-card:hover {
       border-color: rgba(0, 217, 255, 0.3);
-      box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
     }
 
-    .workflow-header {
+    .template-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 1rem;
     }
 
-    .workflow-name {
+    .template-name {
       font-size: 1.25rem;
       font-weight: 600;
       color: #fff;
     }
 
-    .workflow-id {
+    .template-badge {
       font-size: 0.75rem;
-      color: #00d9ff;
-      background: rgba(0, 217, 255, 0.1);
       padding: 0.25rem 0.75rem;
       border-radius: 20px;
       font-family: 'SF Mono', monospace;
     }
 
-    .workflow-description {
+    .badge-instances {
+      background: rgba(0, 217, 255, 0.1);
+      color: #00d9ff;
+    }
+
+    .template-description {
       color: #a8b2d1;
       margin-bottom: 1rem;
       line-height: 1.6;
     }
 
-    .workflow-meta {
-      display: flex;
-      gap: 1rem;
-      margin-bottom: 1rem;
-      font-size: 0.85rem;
-      color: #6b7280;
-    }
-
-    .workflow-meta span {
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
-    }
-
-    .steps-container {
+    /* Parameters Section */
+    .params-section {
       background: rgba(0, 0, 0, 0.2);
       border-radius: 12px;
       padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .params-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #00ff88;
+      margin-bottom: 0.75rem;
+    }
+
+    .params-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .param-item {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+
+    .param-name {
+      font-family: 'SF Mono', monospace;
+      font-size: 0.85rem;
+      color: #00d9ff;
+      margin-bottom: 0.25rem;
+    }
+
+    .param-type {
+      font-size: 0.7rem;
+      color: #6b7280;
+      text-transform: uppercase;
+    }
+
+    .param-desc {
+      font-size: 0.8rem;
+      color: #8892b0;
+      margin-top: 0.25rem;
+    }
+
+    /* Steps Section */
+    .steps-section {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
     }
 
     .steps-title {
@@ -118,9 +212,8 @@
     .step {
       display: flex;
       gap: 1rem;
-      padding: 1rem 0;
+      padding: 0.75rem 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      align-items: flex-start;
     }
 
     .step:last-child {
@@ -141,96 +234,137 @@
       flex-shrink: 0;
     }
 
-    .step-screenshot {
-      width: 160px;
-      height: 100px;
+    .step-content {
+      flex: 1;
+    }
+
+    .step-screen {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-bottom: 0.25rem;
+    }
+
+    .step-action {
+      color: #e8e8e8;
+    }
+
+    .step-action .param-ref {
+      color: #00d9ff;
+      font-family: 'SF Mono', monospace;
+    }
+
+    /* Instances Section */
+    .instances-section {
+      margin-top: 1rem;
+    }
+
+    .instances-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: #8892b0;
+      padding: 0.5rem;
       border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .instances-toggle:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+    }
+
+    .instances-toggle .arrow {
+      transition: transform 0.2s;
+    }
+
+    .instances-toggle.open .arrow {
+      transform: rotate(90deg);
+    }
+
+    .instances-list {
+      display: none;
+      margin-top: 0.75rem;
+      padding-left: 1.5rem;
+    }
+
+    .instances-list.open {
+      display: block;
+    }
+
+    .instance-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .instance-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .instance-date {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .instance-values {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .instance-value {
+      background: rgba(0, 217, 255, 0.1);
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .instance-value .key {
+      color: #8892b0;
+    }
+
+    .instance-value .val {
+      color: #00d9ff;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .instance-screenshots {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .instance-screenshot {
+      width: 120px;
+      height: 75px;
+      border-radius: 6px;
       overflow: hidden;
       flex-shrink: 0;
       cursor: pointer;
       border: 2px solid rgba(255, 255, 255, 0.1);
-      transition: all 0.2s ease;
-      background: rgba(0, 0, 0, 0.3);
+      transition: all 0.2s;
     }
 
-    .step-screenshot:hover {
+    .instance-screenshot:hover {
       border-color: #00d9ff;
-      transform: scale(1.02);
     }
 
-    .step-screenshot img {
+    .instance-screenshot img {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
 
-    .step-screenshot-placeholder {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #6b7280;
-      font-size: 0.75rem;
-    }
-
-    .step-content {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .step-screen {
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 0.25rem;
-      font-size: 1rem;
-    }
-
-    .step-action {
-      font-size: 0.9rem;
-      color: #8892b0;
-      line-height: 1.4;
-    }
-
-    .step-path {
-      font-size: 0.7rem;
-      color: #4a5568;
-      font-family: 'SF Mono', monospace;
-      margin-top: 0.5rem;
-      word-break: break-all;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 4rem 2rem;
-      color: #6b7280;
-    }
-
-    .empty-state h2 {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-      color: #8892b0;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 4rem;
-      color: #8892b0;
-    }
-
-    .loading::after {
-      content: '';
-      display: inline-block;
-      animation: dots 1.5s infinite;
-    }
-
-    @keyframes dots {
-      0%, 20% { content: '.'; }
-      40% { content: '..'; }
-      60%, 100% { content: '...'; }
-    }
-
-    /* Modal for full-size screenshot */
+    /* Modal */
     .modal {
       display: none;
       position: fixed;
@@ -259,17 +393,6 @@
       max-width: 100%;
       max-height: 85vh;
       border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    }
-
-    .modal-info {
-      position: absolute;
-      bottom: -3rem;
-      left: 0;
-      right: 0;
-      text-align: center;
-      color: #8892b0;
-      font-size: 0.9rem;
     }
 
     .modal-close {
@@ -281,83 +404,34 @@
       color: #fff;
       font-size: 2rem;
       cursor: pointer;
-      opacity: 0.7;
-      transition: opacity 0.2s;
     }
 
-    .modal-close:hover {
-      opacity: 1;
+    .modal-info {
+      position: absolute;
+      bottom: -3rem;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #8892b0;
     }
 
-    /* Header with actions */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-left {
-      flex: 1;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1.25rem;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: none;
-      text-decoration: none;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
-      color: #1a1a2e;
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      color: #e8e8e8;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.2);
-    }
-
-    .btn-danger {
-      background: rgba(255, 77, 77, 0.1);
-      color: #ff6b6b;
-      border: 1px solid rgba(255, 77, 77, 0.3);
-    }
-
-    .btn-danger:hover {
-      background: rgba(255, 77, 77, 0.2);
-    }
-
-    .workflow-count {
-      font-size: 0.85rem;
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
       color: #6b7280;
-      margin-top: 0.5rem;
+    }
+
+    .empty-state h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: #8892b0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 4rem;
+      color: #8892b0;
     }
   </style>
 </head>
@@ -366,8 +440,8 @@
     <div class="header">
       <div class="header-left">
         <h1>Workflow Recorder</h1>
-        <p class="subtitle">Captured workflows from your browsing sessions</p>
-        <p class="workflow-count" id="workflow-count"></p>
+        <p class="subtitle">Workflow templates extracted from your browsing sessions</p>
+        <p class="stats" id="stats"></p>
       </div>
       <div class="header-actions">
         <button class="btn btn-primary" onclick="downloadJSON()" id="download-btn" style="display: none;">
@@ -378,12 +452,11 @@
         </button>
       </div>
     </div>
-    <div id="workflows" class="workflow-grid">
-      <div class="loading">Loading workflows</div>
+    <div id="templates" class="template-grid">
+      <div class="loading">Loading templates...</div>
     </div>
   </div>
 
-  <!-- Modal for viewing full screenshots -->
   <div class="modal" id="modal">
     <div class="modal-content">
       <button class="modal-close" onclick="closeModal()">&times;</button>
@@ -393,88 +466,143 @@
   </div>
 
   <script>
-    // Store workflows globally for download
-    let cachedWorkflows = [];
+    let cachedTemplates = [];
 
-    async function loadWorkflows() {
-      const container = document.getElementById('workflows');
-      const countEl = document.getElementById('workflow-count');
+    async function loadTemplates() {
+      const container = document.getElementById('templates');
+      const statsEl = document.getElementById('stats');
       const downloadBtn = document.getElementById('download-btn');
 
       try {
-        const response = await fetch('/workflows');
-        const workflows = await response.json();
-        cachedWorkflows = workflows;
+        const response = await fetch('/templates');
+        const templates = await response.json();
+        cachedTemplates = templates;
 
-        // Update count
-        countEl.textContent = `${workflows.length} workflow${workflows.length !== 1 ? 's' : ''} recorded`;
+        const totalInstances = templates.reduce((sum, t) => sum + (t.instances?.length || 0), 0);
+        statsEl.textContent = `${templates.length} template${templates.length !== 1 ? 's' : ''} • ${totalInstances} instance${totalInstances !== 1 ? 's' : ''}`;
+        downloadBtn.style.display = templates.length > 0 ? 'inline-flex' : 'none';
 
-        // Show/hide download button
-        downloadBtn.style.display = workflows.length > 0 ? 'inline-flex' : 'none';
-
-        if (workflows.length === 0) {
+        if (templates.length === 0) {
           container.innerHTML = `
             <div class="empty-state">
-              <h2>No workflows yet</h2>
-              <p>Start recording by clicking around in your browser with the extension enabled, then click "Stop & Finalize" in the extension popup.</p>
+              <h2>No workflow templates yet</h2>
+              <p>Start recording by clicking the extension, then "Start Recording".<br>
+              Browse around, then click "Stop & Finalize" to extract workflow templates.</p>
             </div>
           `;
           return;
         }
 
-        container.innerHTML = workflows.map(workflow => {
-          const { id, sessionId, refinedJson, createdAt } = workflow;
-          const { name, description, steps } = refinedJson;
-          const date = new Date(createdAt).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          });
+        container.innerHTML = templates.map((template, tIdx) => {
+          const { id, name, description, inputs, outputs, steps, instances } = template;
+          const instanceCount = instances?.length || 0;
 
           return `
-            <div class="workflow-card">
-              <div class="workflow-header">
-                <span class="workflow-name">${escapeHtml(name)}</span>
-                <span class="workflow-id">#${id}</span>
+            <div class="template-card">
+              <div class="template-header">
+                <span class="template-name">${escapeHtml(name)}</span>
+                <span class="template-badge badge-instances">${instanceCount} run${instanceCount !== 1 ? 's' : ''}</span>
               </div>
-              <p class="workflow-description">${escapeHtml(description)}</p>
-              <div class="workflow-meta">
-                <span>📅 ${date}</span>
-                <span>📋 ${steps.length} steps</span>
-                <span>🔗 ${sessionId.slice(0, 8)}...</span>
-              </div>
-              <div class="steps-container">
+              <p class="template-description">${escapeHtml(description)}</p>
+              
+              ${Object.keys(inputs).length > 0 ? `
+                <div class="params-section">
+                  <div class="params-title">📥 Inputs</div>
+                  <div class="params-grid">
+                    ${Object.entries(inputs).map(([key, param]) => `
+                      <div class="param-item">
+                        <div class="param-name">{${key}}</div>
+                        <div class="param-type">${param.type}${param.required ? '' : ' (optional)'}</div>
+                        <div class="param-desc">${escapeHtml(param.description)}</div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+
+              ${Object.keys(outputs).length > 0 ? `
+                <div class="params-section">
+                  <div class="params-title">📤 Outputs</div>
+                  <div class="params-grid">
+                    ${Object.entries(outputs).map(([key, param]) => `
+                      <div class="param-item">
+                        <div class="param-name">{${key}}</div>
+                        <div class="param-type">${param.type}</div>
+                        <div class="param-desc">${escapeHtml(param.description)}</div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+
+              <div class="steps-section">
                 <div class="steps-title">Steps</div>
-                ${steps.map((step, i) => {
-                  const screenshotUrl = step.screenshotPath 
-                    ? '/screenshots/' + step.screenshotPath.split('/').pop()
-                    : null;
-                  const screenName = step.screenLabel || step.screen || 'Unknown';
-                  return `
-                    <div class="step">
-                      <span class="step-number">${i + 1}</span>
-                      <div class="step-screenshot" ${screenshotUrl ? `onclick="openModal('${screenshotUrl}', '${escapeHtml(screenName)}')"` : ''}>
-                        ${screenshotUrl 
-                          ? `<img src="${screenshotUrl}" alt="Screenshot of ${escapeHtml(screenName)}" loading="lazy">`
-                          : '<div class="step-screenshot-placeholder">No image</div>'
-                        }
-                      </div>
-                      <div class="step-content">
-                        <div class="step-screen">${escapeHtml(screenName)}</div>
-                        <div class="step-action">${escapeHtml(step.action)}</div>
-                      </div>
+                ${steps.map((step, i) => `
+                  <div class="step">
+                    <span class="step-number">${step.stepNumber || i + 1}</span>
+                    <div class="step-content">
+                      <div class="step-screen">${escapeHtml(step.screenPattern)}</div>
+                      <div class="step-action">${highlightParams(escapeHtml(step.actionTemplate))}</div>
                     </div>
-                  `;
-                }).join('')}
+                  </div>
+                `).join('')}
               </div>
+
+              ${instanceCount > 0 ? `
+                <div class="instances-section">
+                  <div class="instances-toggle" onclick="toggleInstances(this)">
+                    <span class="arrow">▶</span>
+                    <span>View ${instanceCount} instance${instanceCount !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div class="instances-list">
+                    ${instances.map((inst, iIdx) => {
+                      const date = new Date(inst.createdAt).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      });
+                      return `
+                        <div class="instance-item">
+                          <div class="instance-header">
+                            <span class="instance-date">📅 ${date}</span>
+                          </div>
+                          <div class="instance-values">
+                            ${Object.entries(inst.parameterValues || {}).map(([k, v]) => `
+                              <span class="instance-value">
+                                <span class="key">${k}:</span>
+                                <span class="val">${escapeHtml(String(v))}</span>
+                              </span>
+                            `).join('')}
+                            ${Object.entries(inst.extractedValues || {}).map(([k, v]) => `
+                              <span class="instance-value">
+                                <span class="key">${k}:</span>
+                                <span class="val">${escapeHtml(String(v))}</span>
+                              </span>
+                            `).join('')}
+                          </div>
+                          ${inst.stepSnapshots?.length > 0 ? `
+                            <div class="instance-screenshots">
+                              ${inst.stepSnapshots.map((snap, sIdx) => {
+                                const url = '/screenshots/' + snap.screenshotPath.split('/').pop();
+                                return `
+                                  <div class="instance-screenshot" onclick="openModal('${url}', '${escapeHtml(snap.action)}')">
+                                    <img src="${url}" alt="Step ${snap.stepNumber}" loading="lazy">
+                                  </div>
+                                `;
+                              }).join('')}
+                            </div>
+                          ` : ''}
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           `;
         }).join('');
       } catch (error) {
         container.innerHTML = `
           <div class="empty-state">
-            <h2>Error loading workflows</h2>
+            <h2>Error loading templates</h2>
             <p>${error.message}</p>
           </div>
         `;
@@ -488,21 +616,26 @@
       return div.innerHTML;
     }
 
+    function highlightParams(text) {
+      return text.replace(/\{(\w+)\}/g, '<span class="param-ref">{$1}</span>');
+    }
+
+    function toggleInstances(el) {
+      el.classList.toggle('open');
+      el.nextElementSibling.classList.toggle('open');
+    }
+
     function openModal(src, title) {
       const modal = document.getElementById('modal');
-      const img = document.getElementById('modal-image');
-      const info = document.getElementById('modal-info');
-      img.src = src;
-      info.textContent = title;
+      document.getElementById('modal-image').src = src;
+      document.getElementById('modal-info').textContent = title;
       modal.classList.add('active');
     }
 
     function closeModal() {
-      const modal = document.getElementById('modal');
-      modal.classList.remove('active');
+      document.getElementById('modal').classList.remove('active');
     }
 
-    // Close modal on escape key or clicking outside
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeModal();
     });
@@ -512,35 +645,16 @@
     });
 
     function downloadJSON() {
-      if (cachedWorkflows.length === 0) {
-        alert('No workflows to download');
+      if (cachedTemplates.length === 0) {
+        alert('No templates to download');
         return;
       }
 
-      // Format workflows for export
-      const exportData = {
-        exportedAt: new Date().toISOString(),
-        totalWorkflows: cachedWorkflows.length,
-        workflows: cachedWorkflows.map(w => ({
-          id: w.id,
-          sessionId: w.sessionId,
-          createdAt: new Date(w.createdAt).toISOString(),
-          name: w.refinedJson.name,
-          description: w.refinedJson.description,
-          steps: w.refinedJson.steps.map(step => ({
-            screen: step.screenLabel || step.screen,
-            screenId: step.screenId,
-            action: step.action,
-            screenshotPath: step.screenshotPath
-          }))
-        }))
-      };
-
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(cachedTemplates, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `workflows-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `workflow-templates-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -548,35 +662,26 @@
     }
 
     async function resetDatabase() {
-      const confirmed = confirm(
-        '⚠️ This will permanently delete ALL workflows, screens, and events.\n\n' +
-        'Are you sure you want to clear the database?'
-      );
-      
-      if (!confirmed) return;
+      if (!confirm('⚠️ This will permanently delete ALL templates and instances.\n\nAre you sure?')) return;
 
-      const resetBtn = document.getElementById('reset-btn');
-      resetBtn.disabled = true;
-      resetBtn.textContent = 'Clearing...';
+      const btn = document.getElementById('reset-btn');
+      btn.disabled = true;
+      btn.textContent = 'Clearing...';
 
       try {
         const response = await fetch('/reset', { method: 'POST' });
-        
-        if (!response.ok) {
-          throw new Error('Failed to reset database');
-        }
-
-        alert('✅ Database cleared successfully!');
-        loadWorkflows(); // Refresh the view
+        if (!response.ok) throw new Error('Failed to reset');
+        alert('✅ Database cleared!');
+        loadTemplates();
       } catch (error) {
         alert('❌ Error: ' + error.message);
       } finally {
-        resetBtn.disabled = false;
-        resetBtn.textContent = 'Clear All Data';
+        btn.disabled = false;
+        btn.textContent = 'Clear All Data';
       }
     }
 
-    loadWorkflows();
+    loadTemplates();
   </script>
 </body>
 </html>

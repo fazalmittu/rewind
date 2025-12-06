@@ -4,8 +4,7 @@
  * Responsibilities:
  * - Own and manage the session ID
  * - Track recording state (on/off)
- * - Receive click events from content scripts
- * - Wait for UI stabilization
+ * - Receive events from content scripts (clicks, inputs, changes, submits)
  * - Capture screenshots
  * - Send events + screenshots to backend
  */
@@ -125,17 +124,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 /**
  * Handle a user event:
- * 1. Wait for stabilization
+ * 1. Wait for stabilization (for clicks that cause navigation)
  * 2. Capture screenshot
  * 3. Send to backend
  */
 async function handleUserEvent(payload: {
   sessionId: string;
   timestamp: number;
-  x: number;
-  y: number;
   url: string;
-  eventType: "click";
+  eventType: "click" | "input" | "change" | "submit";
+  targetTag: string;
+  targetText?: string;
+  clickX?: number;
+  clickY?: number;
+  inputValue?: string;
+  inputName?: string;
+  inputLabel?: string;
+  inputType?: string;
 }) {
   // Double-check recording state
   if (!isRecording || !currentSessionId) {
@@ -144,8 +149,13 @@ async function handleUserEvent(payload: {
   }
 
   try {
-    // Wait for UI to stabilize
-    await waitForStabilizedState(400);
+    // For click events, wait for UI to stabilize (might trigger navigation)
+    // For input/change events, capture immediately
+    if (payload.eventType === "click") {
+      await waitForStabilizedState(400);
+    } else {
+      await waitForStabilizedState(100); // Short delay for input events
+    }
 
     // Get the active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -176,7 +186,8 @@ async function handleUserEvent(payload: {
       throw new Error(`Backend error: ${response.status}`);
     }
 
-    console.log("[Workflow Recorder] Event sent to backend successfully");
+    const result = await response.json();
+    console.log(`[Workflow Recorder] ${payload.eventType} event sent:`, result.significant ? "significant" : "not significant");
   } catch (error) {
     console.error("[Workflow Recorder] Error handling event:", error);
   }

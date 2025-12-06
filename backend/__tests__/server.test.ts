@@ -1,252 +1,240 @@
 import request from "supertest";
-import path from "path";
-import fs from "fs";
-import { initDb, closeDb, insertRefinedWorkflow } from "../db";
 import { createApp } from "../server";
+import { initDb, closeDb, clearAllData, insertWorkflowTemplate, insertWorkflowInstance } from "../db";
 import { sessionStore } from "../sessionStore";
+import fs from "fs";
+import path from "path";
 
-// Mock the classifier module
-jest.mock("../classifier", () => ({
-  classifyInteraction: jest.fn().mockResolvedValue({
-    significant: true,
-    screen: {
-      isNew: true,
-      label: "Test Screen",
-      description: "A test screen",
-    },
-    action: "Clicked a button",
-  }),
-  extractUrlPattern: jest.fn().mockReturnValue("/test"),
-}));
+const TEST_DB_PATH = path.join(__dirname, "server-test.db");
+const TEST_SCREENSHOTS_DIR = path.join(__dirname, "..", "..", "storage", "screenshots");
 
-// Mock workflow refiner
-jest.mock("../workflowRefiner", () => ({
-  refineWorkflows: jest.fn().mockResolvedValue([
-    {
-      name: "Test Workflow",
-      description: "A test workflow",
-      steps: [{ screenId: "scr_test", screenLabel: "Dashboard", action: "Clicked button", screenshotPath: "test.png" }],
-    },
-  ]),
-}));
+let app: ReturnType<typeof createApp>;
 
-const TEST_DB_PATH = path.join(__dirname, `test-server-${Date.now()}.db`);
-const TEST_SCREENSHOTS_DIR = path.join(__dirname, "..", "..", "storage", "screenshots-test");
+beforeAll(async () => {
+  await initDb(TEST_DB_PATH);
+  app = createApp();
+  
+  // Ensure screenshots directory exists
+  if (!fs.existsSync(TEST_SCREENSHOTS_DIR)) {
+    fs.mkdirSync(TEST_SCREENSHOTS_DIR, { recursive: true });
+  }
+});
 
-describe("Server", () => {
-  let app: ReturnType<typeof createApp>;
+afterAll(async () => {
+  await closeDb();
+  if (fs.existsSync(TEST_DB_PATH)) {
+    fs.unlinkSync(TEST_DB_PATH);
+  }
+});
 
-  beforeAll(async () => {
-    // Create test screenshots directory
-    if (!fs.existsSync(TEST_SCREENSHOTS_DIR)) {
-      fs.mkdirSync(TEST_SCREENSHOTS_DIR, { recursive: true });
-    }
-    await initDb(TEST_DB_PATH);
-    app = createApp();
+beforeEach(async () => {
+  await clearAllData();
+  sessionStore.clear();
+});
+
+describe("GET /health", () => {
+  it("should return ok status", async () => {
+    const res = await request(app).get("/health");
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
   });
+});
 
-  afterAll(async () => {
-    await closeDb();
-    // Clean up
-    if (fs.existsSync(TEST_DB_PATH)) {
-      fs.unlinkSync(TEST_DB_PATH);
-    }
-    if (fs.existsSync(TEST_SCREENSHOTS_DIR)) {
-      fs.rmSync(TEST_SCREENSHOTS_DIR, { recursive: true });
-    }
+describe("GET /session-stats", () => {
+  it("should return empty stats initially", async () => {
+    const res = await request(app).get("/session-stats");
+    expect(res.status).toBe(200);
+    expect(res.body.activeSessions).toBe(0);
+    expect(res.body.sessions).toHaveLength(0);
   });
+});
 
-  beforeEach(() => {
-    // Clear session store between tests
-    sessionStore.clear();
-  });
+describe("POST /ingest", () => {
+  it("should ingest an event", async () => {
+    // Create a minimal valid base64 PNG (1x1 transparent pixel)
+    const minimalPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-  describe("GET /health", () => {
-    it("should return ok status", async () => {
-      const response = await request(app).get("/health");
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({ status: "ok" });
-    });
-  });
-
-  describe("POST /ingest", () => {
-    // Tiny valid PNG (1x1 pixel, transparent)
-    const tinyPNG =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-
-    it("should return 400 if payload is missing", async () => {
-      const response = await request(app)
-        .post("/ingest")
-        .send({ screenshot: tinyPNG });
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain("Missing");
-    });
-
-    it("should return 400 if screenshot is missing", async () => {
-      const response = await request(app).post("/ingest").send({
+    const res = await request(app)
+      .post("/ingest")
+      .send({
         payload: {
-          sessionId: "test",
+          sessionId: "test-session-123",
+          timestamp: Date.now(),
+          url: "https://example.com/test",
+          eventType: "click",
+          targetTag: "button",
+          targetText: "Add to Cart",
+          clickX: 100,
+          clickY: 200,
+        },
+        screenshot: minimalPng,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
+    expect(res.body.eventType).toBe("click");
+    expect(res.body.eventCount).toBe(1);
+  });
+
+  it("should ingest input events", async () => {
+    const minimalPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+    const res = await request(app)
+      .post("/ingest")
+      .send({
+        payload: {
+          sessionId: "test-session-456",
+          timestamp: Date.now(),
+          url: "https://example.com/search",
+          eventType: "input",
+          targetTag: "input",
+          inputValue: "iPad Pro",
+          inputName: "search",
+          inputLabel: "Search",
+          inputType: "text",
+        },
+        screenshot: minimalPng,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.eventType).toBe("input");
+  });
+
+  it("should reject missing payload", async () => {
+    const res = await request(app)
+      .post("/ingest")
+      .send({ screenshot: "data:image/png;base64,abc" });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("should reject missing screenshot", async () => {
+    const res = await request(app)
+      .post("/ingest")
+      .send({ payload: { sessionId: "test" } });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /session/:sessionId", () => {
+  it("should return 404 for non-existent session", async () => {
+    const res = await request(app).get("/session/non-existent");
+    expect(res.status).toBe(404);
+  });
+
+  it("should return session info for existing session", async () => {
+    // First ingest an event to create a session
+    const minimalPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    await request(app)
+      .post("/ingest")
+      .send({
+        payload: {
+          sessionId: "session-to-get",
           timestamp: Date.now(),
           url: "https://example.com",
           eventType: "click",
+          targetTag: "button",
         },
-      });
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain("Missing");
-    });
-
-    it("should store event and return ok", async () => {
-      const sessionId = `ingest-test-${Date.now()}`;
-      const timestamp = Date.now();
-
-      const response = await request(app)
-        .post("/ingest")
-        .send({
-          payload: {
-            sessionId,
-            timestamp,
-            url: "https://example.com/page",
-            eventType: "click",
-            x: 100,
-            y: 200,
-          },
-          screenshot: tinyPNG,
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body.status).toBe("ok");
-      expect(response.body.significant).toBe(true);
-
-      // Verify screenshot was saved
-      const screenshotPath = path.join(
-        __dirname,
-        "..",
-        "..",
-        "storage",
-        "screenshots",
-        `${timestamp}.png`
-      );
-      expect(fs.existsSync(screenshotPath)).toBe(true);
-
-      // Clean up
-      if (fs.existsSync(screenshotPath)) {
-        fs.unlinkSync(screenshotPath);
-      }
-    });
-  });
-
-  describe("POST /finalize-session", () => {
-    it("should return 400 if sessionId is missing", async () => {
-      const response = await request(app).post("/finalize-session").send({});
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain("sessionId");
-    });
-
-    it("should return empty arrays for session with no events", async () => {
-      const response = await request(app)
-        .post("/finalize-session")
-        .send({ sessionId: "empty-session-xyz" });
-
-      expect(response.status).toBe(200);
-      expect(response.body.ok).toBe(true);
-      expect(response.body.raw).toEqual([]);
-      expect(response.body.refined).toEqual([]);
-    });
-
-    it("should finalize session with events", async () => {
-      const sessionId = `finalize-test-${Date.now()}`;
-      
-      // Create a session with events directly via sessionStore
-      const session = sessionStore.getOrCreate(sessionId);
-      
-      // Add screens
-      const dashScreen = sessionStore.addScreen(sessionId, {
-        label: "Dashboard",
-        description: "Main dashboard",
-        urlPattern: "/dashboard",
-        exampleScreenshotPath: "test-dash.png",
-      });
-      const pageAScreen = sessionStore.addScreen(sessionId, {
-        label: "Page A",
-        description: "Page A",
-        urlPattern: "/page-a",
-        exampleScreenshotPath: "test-a.png",
+        screenshot: minimalPng,
       });
 
-      // Add events - Dashboard (base) -> Page A -> Dashboard
-      sessionStore.addEvent(sessionId, {
-        timestamp: Date.now(),
-        url: "https://example.com/dashboard",
-        screenId: dashScreen.id,
-        actionSummary: "Start",
-        screenshotPath: "test-0.png",
-      });
-      sessionStore.addEvent(sessionId, {
-        timestamp: Date.now() + 1,
-        url: "https://example.com/dashboard",
-        screenId: dashScreen.id,
-        actionSummary: "Stay",
-        screenshotPath: "test-1.png",
-      });
-      sessionStore.addEvent(sessionId, {
-        timestamp: Date.now() + 2,
-        url: "https://example.com/page-a",
-        screenId: pageAScreen.id,
-        actionSummary: "Navigate",
-        screenshotPath: "test-2.png",
-      });
-      sessionStore.addEvent(sessionId, {
-        timestamp: Date.now() + 3,
-        url: "https://example.com/dashboard",
-        screenId: dashScreen.id,
-        actionSummary: "Return",
-        screenshotPath: "test-3.png",
-      });
-
-      const response = await request(app)
-        .post("/finalize-session")
-        .send({ sessionId });
-
-      expect(response.status).toBe(200);
-      expect(response.body.ok).toBe(true);
-      expect(response.body.refined).toHaveLength(1);
-      expect(response.body.refined[0].name).toBe("Test Workflow");
-    });
-  });
-
-  describe("GET /workflows", () => {
-    it("should return all refined workflows", async () => {
-      // Insert a test workflow directly
-      const sessionId = `workflows-test-${Date.now()}`;
-      await insertRefinedWorkflow(sessionId, {
-        name: "Direct Insert Workflow",
-        description: "Inserted directly for testing",
-        steps: [{ screenId: "scr_test", screenLabel: "Test", action: "Test action", screenshotPath: "test.png" }],
-      });
-
-      const response = await request(app).get("/workflows");
-
-      expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThan(0);
-
-      // Find our inserted workflow
-      const found = response.body.find(
-        (w: any) => w.refinedJson.name === "Direct Insert Workflow"
-      );
-      expect(found).toBeDefined();
-      expect(found.refinedJson.description).toBe(
-        "Inserted directly for testing"
-      );
-    });
-  });
-
-  describe("GET /session-stats", () => {
-    it("should return session statistics", async () => {
-      const response = await request(app).get("/session-stats");
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty("activeSessions");
-      expect(response.body).toHaveProperty("sessions");
-    });
+    const res = await request(app).get("/session/session-to-get");
+    expect(res.status).toBe(200);
+    expect(res.body.sessionId).toBe("session-to-get");
+    expect(res.body.eventCount).toBe(1);
   });
 });
+
+describe("GET /templates", () => {
+  it("should return empty array when no templates", async () => {
+    const res = await request(app).get("/templates");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(0);
+  });
+
+  it("should return templates with instances", async () => {
+    const template = {
+      id: "tmpl_test",
+      name: "Test Template",
+      description: "A test template",
+      inputs: {},
+      outputs: {},
+      steps: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await insertWorkflowTemplate(template);
+
+    await insertWorkflowInstance({
+      id: "inst_test",
+      templateId: template.id,
+      sessionId: "sess_test",
+      parameterValues: { query: "test" },
+      extractedValues: {},
+      stepSnapshots: [],
+      createdAt: Date.now(),
+    });
+
+    const res = await request(app).get("/templates");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].name).toBe("Test Template");
+    expect(res.body[0].instances).toHaveLength(1);
+  });
+});
+
+describe("POST /finalize-session", () => {
+  it("should return ok for empty session", async () => {
+    const res = await request(app)
+      .post("/finalize-session")
+      .send({ sessionId: "empty-session" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.message).toBe("No events to process");
+  });
+
+  it("should reject missing sessionId", async () => {
+    const res = await request(app)
+      .post("/finalize-session")
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /reset", () => {
+  it("should clear all data", async () => {
+    // Insert some data first
+    await insertWorkflowTemplate({
+      id: "tmpl_to_delete",
+      name: "To Delete",
+      description: "Will be deleted",
+      inputs: {},
+      outputs: {},
+      steps: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    const beforeReset = await request(app).get("/templates");
+    expect(beforeReset.body).toHaveLength(1);
+
+    const res = await request(app).post("/reset");
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+
+    const afterReset = await request(app).get("/templates");
+    expect(afterReset.body).toHaveLength(0);
+  });
+});
+
+describe("GET /screens", () => {
+  it("should return empty array when no screens", async () => {
+    const res = await request(app).get("/screens");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(0);
+  });
+});
+
