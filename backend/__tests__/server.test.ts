@@ -1,15 +1,22 @@
 import request from "supertest";
 import path from "path";
 import fs from "fs";
-import { initDb, closeDb, insertEvent, insertRefinedWorkflow } from "../db";
+import { initDb, closeDb, insertRefinedWorkflow } from "../db";
 import { createApp } from "../server";
+import { sessionStore } from "../sessionStore";
 
-// Mock LLM functions
-jest.mock("../llm", () => ({
-  summarizeAction: jest.fn().mockResolvedValue("Clicked a button"),
-  summarizeScreen: jest.fn().mockResolvedValue("Dashboard"),
-  callLLMText: jest.fn(),
-  sanitizeJSON: jest.requireActual("../llm").sanitizeJSON,
+// Mock the classifier module
+jest.mock("../classifier", () => ({
+  classifyInteraction: jest.fn().mockResolvedValue({
+    significant: true,
+    screen: {
+      isNew: true,
+      label: "Test Screen",
+      description: "A test screen",
+    },
+    action: "Clicked a button",
+  }),
+  extractUrlPattern: jest.fn().mockReturnValue("/test"),
 }));
 
 // Mock workflow refiner
@@ -18,7 +25,7 @@ jest.mock("../workflowRefiner", () => ({
     {
       name: "Test Workflow",
       description: "A test workflow",
-      steps: [{ screen: "Dashboard", action: "Clicked button" }],
+      steps: [{ screenId: "scr_test", screenLabel: "Dashboard", action: "Clicked button", screenshotPath: "test.png" }],
     },
   ]),
 }));
@@ -47,6 +54,11 @@ describe("Server", () => {
     if (fs.existsSync(TEST_SCREENSHOTS_DIR)) {
       fs.rmSync(TEST_SCREENSHOTS_DIR, { recursive: true });
     }
+  });
+
+  beforeEach(() => {
+    // Clear session store between tests
+    sessionStore.clear();
   });
 
   describe("GET /health", () => {
@@ -102,7 +114,8 @@ describe("Server", () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ status: "ok" });
+      expect(response.body.status).toBe("ok");
+      expect(response.body.significant).toBe(true);
 
       // Verify screenshot was saved
       const screenshotPath = path.join(
@@ -135,35 +148,60 @@ describe("Server", () => {
         .send({ sessionId: "empty-session-xyz" });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ ok: true, raw: [], refined: [] });
+      expect(response.body.ok).toBe(true);
+      expect(response.body.raw).toEqual([]);
+      expect(response.body.refined).toEqual([]);
     });
 
-    it("should segment and refine workflows for session with events", async () => {
+    it("should finalize session with events", async () => {
       const sessionId = `finalize-test-${Date.now()}`;
-      const now = Date.now();
+      
+      // Create a session with events directly via sessionStore
+      const session = sessionStore.getOrCreate(sessionId);
+      
+      // Add screens
+      const dashScreen = sessionStore.addScreen(sessionId, {
+        label: "Dashboard",
+        description: "Main dashboard",
+        urlPattern: "/dashboard",
+        exampleScreenshotPath: "test-dash.png",
+      });
+      const pageAScreen = sessionStore.addScreen(sessionId, {
+        label: "Page A",
+        description: "Page A",
+        urlPattern: "/page-a",
+        exampleScreenshotPath: "test-a.png",
+      });
 
-      // Insert test events that form a workflow
-      // Dashboard (base) -> Page A -> Page B -> Dashboard
-      const events = [
-        { screen: "Dashboard", action: "Start" },
-        { screen: "Dashboard", action: "Stay" },
-        { screen: "Dashboard", action: "Stay more" },
-        { screen: "Page A", action: "Navigate" },
-        { screen: "Page B", action: "Click" },
-        { screen: "Dashboard", action: "Return" },
-      ];
-
-      for (let i = 0; i < events.length; i++) {
-        await insertEvent({
-          sessionId,
-          timestamp: now + i,
-          url: "https://example.com",
-          eventType: "click",
-          screenshotPath: `test-${i}.png`,
-          actionSummary: events[i].action,
-          screenSummary: events[i].screen,
-        });
-      }
+      // Add events - Dashboard (base) -> Page A -> Dashboard
+      sessionStore.addEvent(sessionId, {
+        timestamp: Date.now(),
+        url: "https://example.com/dashboard",
+        screenId: dashScreen.id,
+        actionSummary: "Start",
+        screenshotPath: "test-0.png",
+      });
+      sessionStore.addEvent(sessionId, {
+        timestamp: Date.now() + 1,
+        url: "https://example.com/dashboard",
+        screenId: dashScreen.id,
+        actionSummary: "Stay",
+        screenshotPath: "test-1.png",
+      });
+      sessionStore.addEvent(sessionId, {
+        timestamp: Date.now() + 2,
+        url: "https://example.com/page-a",
+        screenId: pageAScreen.id,
+        actionSummary: "Navigate",
+        screenshotPath: "test-2.png",
+      });
+      sessionStore.addEvent(sessionId, {
+        timestamp: Date.now() + 3,
+        url: "https://example.com/dashboard",
+        screenId: dashScreen.id,
+        actionSummary: "Return",
+        screenshotPath: "test-3.png",
+      });
 
       const response = await request(app)
         .post("/finalize-session")
@@ -183,7 +221,7 @@ describe("Server", () => {
       await insertRefinedWorkflow(sessionId, {
         name: "Direct Insert Workflow",
         description: "Inserted directly for testing",
-        steps: [{ screen: "Test", action: "Test action" }],
+        steps: [{ screenId: "scr_test", screenLabel: "Test", action: "Test action", screenshotPath: "test.png" }],
       });
 
       const response = await request(app).get("/workflows");
@@ -202,6 +240,13 @@ describe("Server", () => {
       );
     });
   });
+
+  describe("GET /session-stats", () => {
+    it("should return session statistics", async () => {
+      const response = await request(app).get("/session-stats");
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty("activeSessions");
+      expect(response.body).toHaveProperty("sessions");
+    });
+  });
 });
-
-

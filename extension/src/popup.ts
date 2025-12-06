@@ -2,28 +2,64 @@
  * Popup Script
  *
  * Responsibilities:
- * - Display current session ID
+ * - Display current recording state
+ * - Handle "Start Recording" button
  * - Handle "Stop & Finalize" button
  * - Show success/error messages
  */
 
-const BACKEND_URL = "http://localhost:3000";
+// API URL injected at build time from environment variable
+const BACKEND_URL = process.env.API_URL || "http://localhost:3000";
 
 // Get DOM elements
+const statusContainer = document.getElementById("statusContainer")!;
+const statusDot = document.getElementById("statusDot")!;
+const statusText = document.getElementById("statusText")!;
+const sessionInfo = document.getElementById("sessionInfo")!;
 const sessionIdEl = document.getElementById("sessionId")!;
+const startBtn = document.getElementById("startBtn") as HTMLButtonElement;
 const finalizeBtn = document.getElementById("finalizeBtn") as HTMLButtonElement;
 const messageEl = document.getElementById("message")!;
 
+let currentState: { sessionId: string | null; isRecording: boolean } = {
+  sessionId: null,
+  isRecording: false,
+};
+
 /**
- * Load and display the current session ID
+ * Update UI based on current state
  */
-async function loadSessionId() {
-  const data = await chrome.storage.local.get("currentSessionId");
-  if (data.currentSessionId) {
-    sessionIdEl.textContent = data.currentSessionId;
+function updateUI() {
+  if (currentState.isRecording && currentState.sessionId) {
+    // Recording active
+    statusContainer.className = "status recording";
+    statusDot.className = "status-dot recording";
+    statusText.textContent = "Recording active";
+    sessionInfo.style.display = "block";
+    sessionIdEl.textContent = currentState.sessionId;
+    startBtn.style.display = "none";
+    finalizeBtn.style.display = "block";
   } else {
-    sessionIdEl.textContent = "No session";
+    // Not recording
+    statusContainer.className = "status idle";
+    statusDot.className = "status-dot idle";
+    statusText.textContent = "Not recording";
+    sessionInfo.style.display = "none";
+    startBtn.style.display = "block";
+    finalizeBtn.style.display = "none";
   }
+}
+
+/**
+ * Load current state from background
+ */
+async function loadState() {
+  chrome.runtime.sendMessage({ type: "GET_STATE" }, (response) => {
+    if (response) {
+      currentState = response;
+      updateUI();
+    }
+  });
 }
 
 /**
@@ -32,29 +68,58 @@ async function loadSessionId() {
 function showMessage(text: string, type: "success" | "error") {
   messageEl.textContent = text;
   messageEl.className = `message ${type}`;
+  messageEl.style.display = "block";
+  
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    messageEl.style.display = "none";
+  }, 5000);
+}
+
+/**
+ * Handle start button click
+ */
+async function handleStart() {
+  startBtn.disabled = true;
+  startBtn.textContent = "Starting...";
+
+  try {
+    chrome.runtime.sendMessage({ type: "START_RECORDING" }, (response) => {
+      if (response?.sessionId) {
+        currentState = { sessionId: response.sessionId, isRecording: true };
+        updateUI();
+        showMessage("Recording started! Click around to capture workflows.", "success");
+      }
+    });
+  } catch (error) {
+    showMessage("Failed to start recording", "error");
+  } finally {
+    startBtn.disabled = false;
+    startBtn.textContent = "Start Recording";
+  }
 }
 
 /**
  * Handle finalize button click
  */
 async function handleFinalize() {
-  const sessionId = sessionIdEl.textContent;
-
-  if (!sessionId || sessionId === "Loading..." || sessionId === "No session") {
+  if (!currentState.sessionId) {
     showMessage("No active session to finalize", "error");
     return;
   }
 
-  // Disable button during processing
   finalizeBtn.disabled = true;
   finalizeBtn.textContent = "Processing...";
 
   try {
-    // Call backend to finalize session
+    // First stop recording
+    chrome.runtime.sendMessage({ type: "STOP_RECORDING" });
+
+    // Then finalize with backend
     const response = await fetch(`${BACKEND_URL}/finalize-session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify({ sessionId: currentState.sessionId }),
     });
 
     if (!response.ok) {
@@ -63,11 +128,10 @@ async function handleFinalize() {
 
     const result = await response.json();
 
-    // Reset session ID for next recording
-    chrome.runtime.sendMessage({ type: "RESET_SESSION" }, (response) => {
-      if (response?.sessionId) {
-        sessionIdEl.textContent = response.sessionId;
-      }
+    // Clear session
+    chrome.runtime.sendMessage({ type: "CLEAR_SESSION" }, () => {
+      currentState = { sessionId: null, isRecording: false };
+      updateUI();
     });
 
     // Show success message
@@ -83,18 +147,16 @@ async function handleFinalize() {
       "error"
     );
   } finally {
-    // Re-enable button
     finalizeBtn.disabled = false;
-    finalizeBtn.textContent = "Stop & Finalize Session";
+    finalizeBtn.textContent = "Stop & Finalize";
   }
 }
 
 // Set up event listeners
+startBtn.addEventListener("click", handleStart);
 finalizeBtn.addEventListener("click", handleFinalize);
 
-// Load session ID on popup open
-loadSessionId();
+// Load state on popup open
+loadState();
 
 console.log("[Workflow Recorder] Popup loaded");
-
-

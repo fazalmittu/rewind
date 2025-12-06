@@ -2,26 +2,29 @@
  * Content Script - Runs in the context of web pages
  *
  * Responsibilities:
- * - Request session ID from background script
- * - Listen for user clicks
+ * - Request recording state from background script
+ * - Listen for user clicks (only when recording)
  * - Send click events to background script for processing
  */
 
 let sessionId: string | null = null;
+let isRecording: boolean = false;
 
-// Request session ID from background script on load
-chrome.runtime.sendMessage({ type: "GET_SESSION_ID" }, (response) => {
-  if (response?.sessionId) {
+// Request state from background script on load
+chrome.runtime.sendMessage({ type: "GET_STATE" }, (response) => {
+  if (response) {
     sessionId = response.sessionId;
-    console.log("[Workflow Recorder] Session ID:", sessionId);
+    isRecording = response.isRecording;
+    console.log("[Workflow Recorder] State:", isRecording ? "RECORDING" : "IDLE", "Session:", sessionId);
   }
 });
 
-// Listen for session ID updates (e.g., after finalization)
+// Listen for state updates from background
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === "SESSION_ID_UPDATED") {
+  if (msg.type === "STATE_UPDATE") {
     sessionId = msg.sessionId;
-    console.log("[Workflow Recorder] Session ID updated:", sessionId);
+    isRecording = msg.isRecording;
+    console.log("[Workflow Recorder] State updated:", isRecording ? "RECORDING" : "IDLE", "Session:", sessionId);
   }
 });
 
@@ -29,9 +32,9 @@ chrome.runtime.onMessage.addListener((msg) => {
 document.addEventListener(
   "click",
   (e) => {
-    if (!sessionId) {
-      console.warn("[Workflow Recorder] No session ID, skipping event");
-      return;
+    // Only capture if recording is active
+    if (!isRecording || !sessionId) {
+      return; // Silently ignore - not recording
     }
 
     const target = e.target as HTMLElement;
@@ -44,7 +47,6 @@ document.addEventListener(
       y: e.clientY,
       url: window.location.href,
       eventType: "click" as const,
-      // Include some context about what was clicked (for debugging)
       targetTag: target.tagName.toLowerCase(),
       targetText: target.textContent?.slice(0, 50) || "",
     };
@@ -55,11 +57,9 @@ document.addEventListener(
       payload,
     });
 
-    console.log("[Workflow Recorder] Click captured:", payload);
+    console.log("[Workflow Recorder] Click captured:", payload.url);
   },
   true // Use capture phase to get all clicks
 );
 
 console.log("[Workflow Recorder] Content script loaded");
-
-

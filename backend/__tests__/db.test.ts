@@ -10,8 +10,10 @@ import {
   insertWorkflowMapping,
   getAllRefinedWorkflows,
   getRawWorkflows,
+  insertScreen,
+  getSessionScreens,
 } from "../db";
-import { RawWorkflow, RefinedWorkflow } from "../types";
+import { RawWorkflow, RefinedWorkflow, KnownScreen } from "../types";
 
 // Use a unique test database for each test run
 const TEST_DB_PATH = path.join(__dirname, `test-${Date.now()}.db`);
@@ -32,8 +34,29 @@ describe("Database", () => {
   describe("initDb", () => {
     it("should create all required tables", async () => {
       // If we got here without errors, tables were created
-      // We can verify by inserting data successfully
       expect(true).toBe(true);
+    });
+  });
+
+  describe("screens", () => {
+    const testSessionId = "test-session-screens";
+
+    it("should insert and fetch screens", async () => {
+      const screen: KnownScreen = {
+        id: "scr_test123",
+        label: "Dashboard",
+        description: "Main dashboard screen",
+        urlPattern: "/dashboard",
+        exampleScreenshotPath: "screenshots/1.png",
+        seenCount: 3,
+      };
+
+      await insertScreen(screen, testSessionId);
+      const screens = await getSessionScreens(testSessionId);
+      
+      expect(screens.length).toBe(1);
+      expect(screens[0].label).toBe("Dashboard");
+      expect(screens[0].seenCount).toBe(3);
     });
   });
 
@@ -47,8 +70,8 @@ describe("Database", () => {
         url: "https://example.com",
         eventType: "click" as const,
         screenshotPath: "storage/screenshots/test.png",
+        screenId: "scr_abc123",
         actionSummary: "Clicked a button",
-        screenSummary: "Login Page",
       };
 
       const id = await insertEvent(event);
@@ -66,8 +89,8 @@ describe("Database", () => {
         url: "https://example.com/page2",
         eventType: "click",
         screenshotPath: "storage/screenshots/2.png",
+        screenId: "scr_page2",
         actionSummary: "Action 2",
-        screenSummary: "Page 2",
       });
 
       await insertEvent({
@@ -76,8 +99,8 @@ describe("Database", () => {
         url: "https://example.com/page1",
         eventType: "click",
         screenshotPath: "storage/screenshots/1.png",
+        screenId: "scr_page1",
         actionSummary: "Action 1",
-        screenSummary: "Page 1",
       });
 
       const events = await getSessionEvents(testSessionId);
@@ -103,8 +126,8 @@ describe("Database", () => {
     it("should insert a raw workflow and return its ID", async () => {
       const workflow: RawWorkflow = {
         steps: [
-          { screen: "Dashboard", action: "Clicked menu" },
-          { screen: "Settings", action: "Clicked save" },
+          { screenId: "scr_dash", screenLabel: "Dashboard", action: "Clicked menu", screenshotPath: "1.png" },
+          { screenId: "scr_settings", screenLabel: "Settings", action: "Clicked save", screenshotPath: "2.png" },
         ],
       };
 
@@ -129,9 +152,9 @@ describe("Database", () => {
         name: "Update Settings",
         description: "User navigates to settings and saves changes",
         steps: [
-          { screen: "Dashboard", action: "Clicked settings icon" },
-          { screen: "Settings Page", action: "Updated preferences" },
-          { screen: "Settings Page", action: "Clicked save button" },
+          { screenId: "scr_dash", screenLabel: "Dashboard", action: "Clicked settings icon", screenshotPath: "1.png" },
+          { screenId: "scr_settings", screenLabel: "Settings Page", action: "Updated preferences", screenshotPath: "2.png" },
+          { screenId: "scr_settings", screenLabel: "Settings Page", action: "Clicked save button", screenshotPath: "3.png" },
         ],
       };
 
@@ -157,7 +180,7 @@ describe("Database", () => {
     it("should create mappings between raw and refined workflows", async () => {
       // Create raw workflow
       const raw: RawWorkflow = {
-        steps: [{ screen: "Home", action: "Click" }],
+        steps: [{ screenId: "scr_home", screenLabel: "Home", action: "Click", screenshotPath: "1.png" }],
       };
       const rawId = await insertRawWorkflow(testSessionId, raw);
 
@@ -165,7 +188,7 @@ describe("Database", () => {
       const refined: RefinedWorkflow = {
         name: "Test Flow",
         description: "A test workflow",
-        steps: [{ screen: "Home", action: "Click" }],
+        steps: [{ screenId: "scr_home", screenLabel: "Home", action: "Click", screenshotPath: "1.png" }],
       };
       const refinedId = await insertRefinedWorkflow(testSessionId, refined);
 
@@ -176,14 +199,14 @@ describe("Database", () => {
     });
 
     it("should allow multiple raw workflows to map to one refined workflow", async () => {
-      const raw1: RawWorkflow = { steps: [{ screen: "A", action: "1" }] };
-      const raw2: RawWorkflow = { steps: [{ screen: "B", action: "2" }] };
+      const raw1: RawWorkflow = { steps: [{ screenId: "scr_a", screenLabel: "A", action: "1", screenshotPath: "1.png" }] };
+      const raw2: RawWorkflow = { steps: [{ screenId: "scr_b", screenLabel: "B", action: "2", screenshotPath: "2.png" }] };
       const refined: RefinedWorkflow = {
         name: "Merged Flow",
         description: "Merged from two raw workflows",
         steps: [
-          { screen: "A", action: "1" },
-          { screen: "B", action: "2" },
+          { screenId: "scr_a", screenLabel: "A", action: "1", screenshotPath: "1.png" },
+          { screenId: "scr_b", screenLabel: "B", action: "2", screenshotPath: "2.png" },
         ],
       };
 
@@ -200,5 +223,3 @@ describe("Database", () => {
     });
   });
 });
-
-

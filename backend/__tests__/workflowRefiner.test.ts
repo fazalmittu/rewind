@@ -27,8 +27,8 @@ describe("workflowRefiner", () => {
       const raw: RawWorkflow[] = [
         {
           steps: [
-            { screen: "Dashboard", action: "Clicked patients" },
-            { screen: "Patient List", action: "Selected patient" },
+            { screenId: "scr_dash", screenLabel: "Dashboard", action: "Clicked patients", screenshotPath: "1.png" },
+            { screenId: "scr_list", screenLabel: "Patient List", action: "Selected patient", screenshotPath: "2.png" },
           ],
         },
       ];
@@ -53,11 +53,13 @@ describe("workflowRefiner", () => {
       expect(result[0].name).toBe("View Patient");
       expect(result[0].description).toBe("Navigate to view patient details");
       expect(result[0].steps).toHaveLength(2);
+      // Should preserve screenId from raw workflow
+      expect(result[0].steps[0].screenId).toBe("scr_dash");
     });
 
     it("should handle LLM response with markdown fences", async () => {
       const raw: RawWorkflow[] = [
-        { steps: [{ screen: "Home", action: "Click" }] },
+        { steps: [{ screenId: "scr_home", screenLabel: "Home", action: "Click", screenshotPath: "1.png" }] },
       ];
 
       const mockResponse = `\`\`\`json
@@ -80,15 +82,15 @@ describe("workflowRefiner", () => {
 
     it("should handle multiple workflows", async () => {
       const raw: RawWorkflow[] = [
-        { steps: [{ screen: "A", action: "1" }] },
-        { steps: [{ screen: "B", action: "2" }] },
-        { steps: [{ screen: "C", action: "3" }] },
+        { steps: [{ screenId: "scr_a", screenLabel: "A", action: "1", screenshotPath: "1.png" }] },
+        { steps: [{ screenId: "scr_b", screenLabel: "B", action: "2", screenshotPath: "2.png" }] },
+        { steps: [{ screenId: "scr_c", screenLabel: "C", action: "3", screenshotPath: "3.png" }] },
       ];
 
       const mockResponse = JSON.stringify([
-        { name: "Flow A", description: "First flow", steps: raw[0].steps },
-        { name: "Flow B", description: "Second flow", steps: raw[1].steps },
-        { name: "Flow C", description: "Third flow", steps: raw[2].steps },
+        { name: "Flow A", description: "First flow", steps: [{ screen: "A", action: "1" }] },
+        { name: "Flow B", description: "Second flow", steps: [{ screen: "B", action: "2" }] },
+        { name: "Flow C", description: "Third flow", steps: [{ screen: "C", action: "3" }] },
       ]);
 
       mockCallLLMText.mockResolvedValue(mockResponse);
@@ -102,8 +104,8 @@ describe("workflowRefiner", () => {
     it("should handle GPT merging workflows", async () => {
       // GPT might merge similar workflows
       const raw: RawWorkflow[] = [
-        { steps: [{ screen: "Settings", action: "Open" }] },
-        { steps: [{ screen: "Settings", action: "Open settings" }] },
+        { steps: [{ screenId: "scr_settings", screenLabel: "Settings", action: "Open", screenshotPath: "1.png" }] },
+        { steps: [{ screenId: "scr_settings", screenLabel: "Settings", action: "Open settings", screenshotPath: "2.png" }] },
       ];
 
       // GPT merges them into one
@@ -128,8 +130,8 @@ describe("workflowRefiner", () => {
       const raw: RawWorkflow[] = [
         {
           steps: [
-            { screen: "Login", action: "Enter credentials" },
-            { screen: "Dashboard", action: "View main page" },
+            { screenId: "scr_login", screenLabel: "Login", action: "Enter credentials", screenshotPath: "1.png" },
+            { screenId: "scr_dash", screenLabel: "Dashboard", action: "View main page", screenshotPath: "2.png" },
           ],
         },
       ];
@@ -139,7 +141,10 @@ describe("workflowRefiner", () => {
           {
             name: "Login Flow",
             description: "User logs in",
-            steps: raw[0].steps,
+            steps: [
+              { screen: "Login", action: "Enter credentials" },
+              { screen: "Dashboard", action: "View main page" },
+            ],
           },
         ])
       );

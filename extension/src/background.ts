@@ -3,6 +3,7 @@
  *
  * Responsibilities:
  * - Own and manage the session ID
+ * - Track recording state (on/off)
  * - Receive click events from content scripts
  * - Wait for UI stabilization
  * - Capture screenshots
@@ -11,79 +12,111 @@
 
 import { waitForStabilizedState } from "./stabilization";
 
-let currentSessionId: string = "";
+// API URL injected at build time from environment variable
+const API_URL = process.env.API_URL || "http://localhost:3000";
 
-// Initialize session ID on install
-chrome.runtime.onInstalled.addListener(() => {
-  currentSessionId = crypto.randomUUID();
-  chrome.storage.local.set({ currentSessionId });
-  console.log("[Workflow Recorder] Installed, session ID:", currentSessionId);
-});
+let currentSessionId: string | null = null;
+let isRecording: boolean = false;
 
-// Restore session ID on startup
-chrome.runtime.onStartup.addListener(async () => {
-  const data = await chrome.storage.local.get("currentSessionId");
-  if (data.currentSessionId) {
-    currentSessionId = data.currentSessionId;
-    console.log("[Workflow Recorder] Restored session ID:", currentSessionId);
-  } else {
-    currentSessionId = crypto.randomUUID();
-    chrome.storage.local.set({ currentSessionId });
-    console.log("[Workflow Recorder] Created new session ID:", currentSessionId);
-  }
-});
-
-// Also check storage on worker activation (service workers can restart)
-chrome.storage.local.get("currentSessionId").then((data) => {
-  if (data.currentSessionId) {
-    currentSessionId = data.currentSessionId;
-  } else {
-    currentSessionId = crypto.randomUUID();
-    chrome.storage.local.set({ currentSessionId });
-  }
-  console.log("[Workflow Recorder] Background ready, session ID:", currentSessionId);
+// Restore state on worker activation (service workers can restart)
+chrome.storage.local.get(["currentSessionId", "isRecording"]).then((data) => {
+  currentSessionId = data.currentSessionId || null;
+  isRecording = data.isRecording || false;
+  console.log("[Workflow Recorder] Background ready, recording:", isRecording, "session:", currentSessionId);
 });
 
 /**
- * Reset session ID and return the new one
+ * Start a new recording session
  */
-function resetSessionId(): string {
+function startRecording(): { sessionId: string } {
   currentSessionId = crypto.randomUUID();
-  chrome.storage.local.set({ currentSessionId });
-  console.log("[Workflow Recorder] Session reset, new ID:", currentSessionId);
+  isRecording = true;
+  chrome.storage.local.set({ currentSessionId, isRecording });
+  console.log("[Workflow Recorder] Recording STARTED, session ID:", currentSessionId);
 
-  // Notify all content scripts of the new session ID
+  // Notify all content scripts
+  notifyContentScripts();
+
+  return { sessionId: currentSessionId };
+}
+
+/**
+ * Stop recording (but don't finalize yet)
+ */
+function stopRecording(): void {
+  isRecording = false;
+  chrome.storage.local.set({ isRecording });
+  console.log("[Workflow Recorder] Recording STOPPED");
+
+  // Notify all content scripts
+  notifyContentScripts();
+}
+
+/**
+ * Clear session after finalization
+ */
+function clearSession(): void {
+  currentSessionId = null;
+  isRecording = false;
+  chrome.storage.local.set({ currentSessionId: null, isRecording: false });
+  console.log("[Workflow Recorder] Session cleared");
+
+  // Notify all content scripts
+  notifyContentScripts();
+}
+
+/**
+ * Notify all content scripts of current state
+ */
+function notifyContentScripts(): void {
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       if (tab.id) {
         chrome.tabs.sendMessage(tab.id, {
-          type: "SESSION_ID_UPDATED",
+          type: "STATE_UPDATE",
           sessionId: currentSessionId,
+          isRecording,
         }).catch(() => {
           // Tab might not have content script loaded, ignore
         });
       }
     });
   });
-
-  return currentSessionId;
 }
 
 // Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === "GET_SESSION_ID") {
-    sendResponse({ sessionId: currentSessionId });
+  if (msg.type === "GET_STATE") {
+    sendResponse({ 
+      sessionId: currentSessionId, 
+      isRecording 
+    });
     return true;
   }
 
-  if (msg.type === "RESET_SESSION") {
-    const newId = resetSessionId();
-    sendResponse({ sessionId: newId });
+  if (msg.type === "START_RECORDING") {
+    const result = startRecording();
+    sendResponse(result);
+    return true;
+  }
+
+  if (msg.type === "STOP_RECORDING") {
+    stopRecording();
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (msg.type === "CLEAR_SESSION") {
+    clearSession();
+    sendResponse({ ok: true });
     return true;
   }
 
   if (msg.type === "USER_EVENT") {
-    handleUserEvent(msg.payload);
+    // Only process if recording is active
+    if (isRecording && currentSessionId) {
+      handleUserEvent(msg.payload);
+    }
     return true;
   }
 
@@ -104,6 +137,12 @@ async function handleUserEvent(payload: {
   url: string;
   eventType: "click";
 }) {
+  // Double-check recording state
+  if (!isRecording || !currentSessionId) {
+    console.log("[Workflow Recorder] Not recording, skipping event");
+    return;
+  }
+
   try {
     // Wait for UI to stabilize
     await waitForStabilizedState(400);
@@ -121,11 +160,14 @@ async function handleUserEvent(payload: {
     });
 
     // Send to backend
-    const response = await fetch("http://localhost:3000/ingest", {
+    const response = await fetch(`${API_URL}/ingest`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        payload,
+        payload: {
+          ...payload,
+          sessionId: currentSessionId, // Use current session ID
+        },
         screenshot: dataUrl,
       }),
     });
@@ -141,5 +183,3 @@ async function handleUserEvent(payload: {
 }
 
 console.log("[Workflow Recorder] Background service worker loaded");
-
-

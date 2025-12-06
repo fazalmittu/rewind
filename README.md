@@ -15,6 +15,15 @@ cp .env.example .env
 # Edit .env and add your OpenAI API key
 ```
 
+Required environment variables in `.env`:
+```bash
+OPENAI_API_KEY=sk-your-key-here    # Required: Your OpenAI API key
+OPENAI_MODEL=gpt-4o                # Optional: Model to use (default: gpt-4o)
+API_URL=http://localhost:3000      # Optional: Backend URL (default: localhost:3000)
+```
+
+Supported models: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-5.1`, etc.
+
 ### 3. Start Backend
 ```bash
 npm run dev

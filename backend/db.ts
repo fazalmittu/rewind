@@ -6,6 +6,9 @@ import {
   RefinedWorkflow,
   RawWorkflowRow,
   RefinedWorkflowRow,
+  ScreenRow,
+  KnownScreen,
+  SessionEvent,
 } from "./types";
 
 sqlite3.verbose();
@@ -24,7 +27,21 @@ export const initDb = (dbPath?: string): Promise<void> => {
       }
 
       db.serialize(() => {
-        // Events table
+        // Screens table - canonical screens identified during sessions
+        db.run(`
+          CREATE TABLE IF NOT EXISTS screens (
+            id TEXT PRIMARY KEY,
+            sessionId TEXT NOT NULL,
+            label TEXT NOT NULL,
+            description TEXT NOT NULL,
+            urlPattern TEXT NOT NULL,
+            exampleScreenshotPath TEXT NOT NULL,
+            seenCount INTEGER NOT NULL DEFAULT 1,
+            createdAt INTEGER NOT NULL
+          )
+        `);
+
+        // Events table - with screenId reference
         db.run(`
           CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,8 +50,9 @@ export const initDb = (dbPath?: string): Promise<void> => {
             url TEXT NOT NULL,
             eventType TEXT NOT NULL,
             screenshotPath TEXT NOT NULL,
+            screenId TEXT,
             actionSummary TEXT NOT NULL,
-            screenSummary TEXT NOT NULL
+            screenSummary TEXT
           )
         `);
 
@@ -92,21 +110,85 @@ export const closeDb = (): Promise<void> => {
   });
 };
 
+// ============================================
+// SCREEN OPERATIONS
+// ============================================
+
+export const insertScreen = (screen: KnownScreen, sessionId: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT OR REPLACE INTO screens (id, sessionId, label, description, urlPattern, exampleScreenshotPath, seenCount, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        screen.id,
+        sessionId,
+        screen.label,
+        screen.description,
+        screen.urlPattern,
+        screen.exampleScreenshotPath,
+        screen.seenCount,
+        Date.now(),
+      ],
+      function (err) {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+};
+
+export const insertScreens = async (screens: KnownScreen[], sessionId: string): Promise<void> => {
+  for (const screen of screens) {
+    await insertScreen(screen, sessionId);
+  }
+};
+
+export const getScreenById = (screenId: string): Promise<ScreenRow | null> => {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT * FROM screens WHERE id = ?`,
+      [screenId],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve((row as ScreenRow) || null);
+      }
+    );
+  });
+};
+
+export const getSessionScreens = (sessionId: string): Promise<ScreenRow[]> => {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT * FROM screens WHERE sessionId = ? ORDER BY createdAt ASC`,
+      [sessionId],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve((rows as ScreenRow[]) || []);
+      }
+    );
+  });
+};
+
+// ============================================
+// EVENT OPERATIONS
+// ============================================
+
 export const insertEvent = (
   ev: Omit<RecordedEvent, "id">
 ): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT INTO events (sessionId, timestamp, url, eventType, screenshotPath, actionSummary, screenSummary)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO events (sessionId, timestamp, url, eventType, screenshotPath, screenId, actionSummary, screenSummary)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         ev.sessionId,
         ev.timestamp,
         ev.url,
         ev.eventType,
         ev.screenshotPath,
+        ev.screenId || null,
         ev.actionSummary,
-        ev.screenSummary,
+        ev.screenSummary || null,
       ],
       function (err) {
         if (err) reject(err);
@@ -114,6 +196,23 @@ export const insertEvent = (
       }
     );
   });
+};
+
+export const insertSessionEvents = async (
+  events: SessionEvent[],
+  sessionId: string
+): Promise<void> => {
+  for (const event of events) {
+    await insertEvent({
+      sessionId,
+      timestamp: event.timestamp,
+      url: event.url,
+      eventType: "click",
+      screenshotPath: event.screenshotPath,
+      screenId: event.screenId,
+      actionSummary: event.actionSummary,
+    });
+  }
 };
 
 export const getSessionEvents = (
@@ -130,6 +229,10 @@ export const getSessionEvents = (
     );
   });
 };
+
+// ============================================
+// WORKFLOW OPERATIONS
+// ============================================
 
 export const insertRawWorkflow = (
   sessionId: string,
@@ -225,5 +328,3 @@ export const getRawWorkflows = (sessionId: string): Promise<RawWorkflowRow[]> =>
     );
   });
 };
-
-

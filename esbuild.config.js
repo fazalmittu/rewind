@@ -1,7 +1,13 @@
 const esbuild = require('esbuild');
 const path = require('path');
 
+// Load environment variables from .env
+require('dotenv').config();
+
 const isWatch = process.argv.includes('--watch');
+
+// Get API URL from environment or use default
+const API_URL = process.env.API_URL || 'http://localhost:3000';
 
 const buildOptions = {
   entryPoints: [
@@ -14,11 +20,17 @@ const buildOptions = {
   format: 'iife',
   target: 'chrome90',
   sourcemap: true,
-  minify: false
+  minify: false,
+  // Inject environment variables at build time
+  define: {
+    'process.env.API_URL': JSON.stringify(API_URL),
+  },
 };
 
 async function build() {
   try {
+    console.log(`Building extension with API_URL: ${API_URL}`);
+    
     if (isWatch) {
       const ctx = await esbuild.context(buildOptions);
       await ctx.watch();
@@ -34,5 +46,3 @@ async function build() {
 }
 
 build();
-
-
