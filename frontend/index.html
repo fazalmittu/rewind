@@ -16,12 +16,12 @@
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       min-height: 100vh;
       color: #e8e8e8;
-      padding: 2rem;
     }
 
     .container {
-      max-width: 1400px;
+      max-width: 1000px;
       margin: 0 auto;
+      padding: 2rem;
     }
 
     h1 {
@@ -286,7 +286,6 @@
     .instances-list {
       display: none;
       margin-top: 0.75rem;
-      padding-left: 1.5rem;
     }
 
     .instances-list.open {
@@ -324,6 +323,9 @@
       padding: 0.25rem 0.75rem;
       border-radius: 4px;
       font-size: 0.8rem;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .instance-value .key {
@@ -352,16 +354,33 @@
       cursor: pointer;
       border: 2px solid rgba(255, 255, 255, 0.1);
       transition: all 0.2s;
+      position: relative;
     }
 
     .instance-screenshot:hover {
       border-color: #00d9ff;
     }
 
+    .instance-screenshot.active {
+      border-color: #00ff88;
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    }
+
     .instance-screenshot img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+    }
+
+    .instance-screenshot .step-badge {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
     }
 
     /* Modal */
@@ -372,7 +391,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.9);
+      background: rgba(0, 0, 0, 0.95);
       z-index: 1000;
       justify-content: center;
       align-items: center;
@@ -387,11 +406,14 @@
       max-width: 90%;
       max-height: 90%;
       position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .modal-content img {
       max-width: 100%;
-      max-height: 85vh;
+      max-height: 80vh;
       border-radius: 12px;
     }
 
@@ -407,12 +429,48 @@
     }
 
     .modal-info {
-      position: absolute;
-      bottom: -3rem;
-      left: 0;
-      right: 0;
+      margin-top: 1rem;
       text-align: center;
       color: #8892b0;
+    }
+
+    .modal-nav-hint {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .modal-nav {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .modal-nav button {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 0.5rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    .modal-nav button:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .modal-nav button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .modal-counter {
+      color: #00d9ff;
+      font-family: 'SF Mono', monospace;
+      font-size: 0.9rem;
+      padding: 0.5rem 1rem;
     }
 
     /* Empty state */
@@ -462,11 +520,21 @@
       <button class="modal-close" onclick="closeModal()">&times;</button>
       <img id="modal-image" src="" alt="Screenshot">
       <div class="modal-info" id="modal-info"></div>
+      <div class="modal-nav">
+        <button onclick="prevScreenshot()" id="prev-btn">← Prev</button>
+        <span class="modal-counter" id="modal-counter">1 / 1</span>
+        <button onclick="nextScreenshot()" id="next-btn">Next →</button>
+      </div>
+      <div class="modal-nav-hint">Use ← → arrow keys to navigate</div>
     </div>
   </div>
 
   <script>
     let cachedTemplates = [];
+    
+    // Modal state for navigation
+    let currentScreenshots = [];
+    let currentScreenshotIndex = 0;
 
     async function loadTemplates() {
       const container = document.getElementById('templates');
@@ -507,7 +575,7 @@
               
               ${Object.keys(inputs).length > 0 ? `
                 <div class="params-section">
-                  <div class="params-title">📥 Inputs</div>
+                  <div class="params-title">Inputs</div>
                   <div class="params-grid">
                     ${Object.entries(inputs).map(([key, param]) => `
                       <div class="param-item">
@@ -559,6 +627,7 @@
                       const date = new Date(inst.createdAt).toLocaleDateString('en-US', {
                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                       });
+                      const screenshotsJson = JSON.stringify(inst.stepSnapshots || []).replace(/'/g, "\\'");
                       return `
                         <div class="instance-item">
                           <div class="instance-header">
@@ -568,22 +637,23 @@
                             ${Object.entries(inst.parameterValues || {}).map(([k, v]) => `
                               <span class="instance-value">
                                 <span class="key">${k}:</span>
-                                <span class="val">${escapeHtml(String(v))}</span>
+                                <span class="val">${escapeHtml(truncate(String(v), 50))}</span>
                               </span>
                             `).join('')}
-                            ${Object.entries(inst.extractedValues || {}).map(([k, v]) => `
+                            ${Object.entries(inst.extractedValues || {}).filter(([k,v]) => v != null).map(([k, v]) => `
                               <span class="instance-value">
                                 <span class="key">${k}:</span>
-                                <span class="val">${escapeHtml(String(v))}</span>
+                                <span class="val">${escapeHtml(truncate(String(v), 50))}</span>
                               </span>
                             `).join('')}
                           </div>
                           ${inst.stepSnapshots?.length > 0 ? `
-                            <div class="instance-screenshots">
+                            <div class="instance-screenshots" data-screenshots='${screenshotsJson}'>
                               ${inst.stepSnapshots.map((snap, sIdx) => {
                                 const url = '/screenshots/' + snap.screenshotPath.split('/').pop();
                                 return `
-                                  <div class="instance-screenshot" onclick="openModal('${url}', '${escapeHtml(snap.action)}')">
+                                  <div class="instance-screenshot" onclick="openModalWithNav(this, ${sIdx})" data-url="${url}" data-action="${escapeHtml(snap.action)}">
+                                    <span class="step-badge">${snap.stepNumber}</span>
                                     <img src="${url}" alt="Step ${snap.stepNumber}" loading="lazy">
                                   </div>
                                 `;
@@ -616,6 +686,11 @@
       return div.innerHTML;
     }
 
+    function truncate(text, maxLen) {
+      if (!text) return '';
+      return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
+    }
+
     function highlightParams(text) {
       return text.replace(/\{(\w+)\}/g, '<span class="param-ref">{$1}</span>');
     }
@@ -625,19 +700,81 @@
       el.nextElementSibling.classList.toggle('open');
     }
 
-    function openModal(src, title) {
-      const modal = document.getElementById('modal');
-      document.getElementById('modal-image').src = src;
-      document.getElementById('modal-info').textContent = title;
-      modal.classList.add('active');
+    // New modal functions with navigation
+    function openModalWithNav(el, index) {
+      const container = el.closest('.instance-screenshots');
+      const screenshots = container.querySelectorAll('.instance-screenshot');
+      
+      // Build array of screenshot data
+      currentScreenshots = Array.from(screenshots).map(s => ({
+        url: s.dataset.url,
+        action: s.dataset.action,
+        element: s
+      }));
+      currentScreenshotIndex = index;
+      
+      updateModal();
+      document.getElementById('modal').classList.add('active');
+    }
+
+    function updateModal() {
+      const screenshot = currentScreenshots[currentScreenshotIndex];
+      if (!screenshot) return;
+      
+      document.getElementById('modal-image').src = screenshot.url;
+      document.getElementById('modal-info').textContent = screenshot.action;
+      document.getElementById('modal-counter').textContent = 
+        `${currentScreenshotIndex + 1} / ${currentScreenshots.length}`;
+      
+      // Update nav buttons
+      document.getElementById('prev-btn').disabled = currentScreenshotIndex === 0;
+      document.getElementById('next-btn').disabled = currentScreenshotIndex === currentScreenshots.length - 1;
+      
+      // Update active state on thumbnails
+      currentScreenshots.forEach((s, i) => {
+        s.element.classList.toggle('active', i === currentScreenshotIndex);
+      });
+    }
+
+    function nextScreenshot() {
+      if (currentScreenshotIndex < currentScreenshots.length - 1) {
+        currentScreenshotIndex++;
+        updateModal();
+      }
+    }
+
+    function prevScreenshot() {
+      if (currentScreenshotIndex > 0) {
+        currentScreenshotIndex--;
+        updateModal();
+      }
     }
 
     function closeModal() {
       document.getElementById('modal').classList.remove('active');
+      // Clear active states
+      currentScreenshots.forEach(s => s.element.classList.remove('active'));
+      currentScreenshots = [];
     }
 
+    // Keyboard navigation
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeModal();
+      const modal = document.getElementById('modal');
+      if (!modal.classList.contains('active')) return;
+      
+      switch(e.key) {
+        case 'Escape':
+          closeModal();
+          break;
+        case 'ArrowLeft':
+          prevScreenshot();
+          e.preventDefault();
+          break;
+        case 'ArrowRight':
+          nextScreenshot();
+          e.preventDefault();
+          break;
+      }
     });
 
     document.getElementById('modal').addEventListener('click', (e) => {

@@ -23,96 +23,116 @@ export async function synthesizeTemplate(
 ): Promise<SynthesisResult> {
   const screenLookup = new Map(screens.map((s) => [s.id, s]));
 
-  // Prepare event data for GPT
+  // Prepare event data for GPT with rich context
   const eventData = instance.events.map((event, idx) => {
     const screen = event.screenId ? screenLookup.get(event.screenId) : null;
     return {
       stepNumber: idx + 1,
       screenType: screen?.label || "Unknown",
       eventType: event.eventType,
-      action: event.actionSummary || event.targetText?.slice(0, 100) || "User action",
-      inputValue: event.inputValue || null,
-      inputName: event.inputLabel || event.inputName || null,
-      inputType: event.inputType || null,
-      clickedText: event.targetText?.slice(0, 100) || null,
+      // For clicks, show what was clicked
+      clickedText: event.eventType === "click" ? (event.targetText?.slice(0, 150) || null) : null,
+      // For inputs, show what was typed
+      typedText: event.eventType === "input" ? event.inputValue : null,
+      inputFieldName: event.eventType === "input" ? (event.inputLabel || event.inputName || null) : null,
+      inputFieldType: event.eventType === "input" ? event.inputType : null,
+      // For changes (dropdowns, etc)
+      selectedValue: event.eventType === "change" ? event.inputValue : null,
+      // URL for context
+      url: event.url,
     };
   });
 
-  const prompt = `You are creating a REUSABLE workflow template from a specific execution.
+  const prompt = `You are creating a REUSABLE workflow template from a recorded user session.
 
-Goal of this workflow: "${instance.goal}"
+WORKFLOW GOAL: "${instance.goal}"
 
-Events that occurred:
+RECORDED EVENTS (in order):
 ${JSON.stringify(eventData, null, 2)}
 
-Your task:
-1. Create a GENERIC workflow template that could be reused with different inputs
-2. Identify INPUT PARAMETERS - values the user provided that would vary between executions:
-   - Search queries, form inputs, quantities, selections
-   - Give them generic names like "search_query", "quantity", "item_name"
-3. Identify OUTPUT PARAMETERS - values extracted during execution:
-   - Product names clicked, prices seen, confirmation messages
-4. Create TEMPLATE STEPS with {placeholders} for parameters
+YOUR TASK:
+1. Create a generic, reusable workflow template
+2. Identify INPUT PARAMETERS - user-provided values that would vary:
+   - Text typed into fields (typedText)
+   - Selections made (selectedValue)
+   - Items clicked that represent choices
+   - Give descriptive snake_case names: comment_text, issue_title, assignee_name, status_value
+3. Identify OUTPUT/EXTRACTED values - data captured during execution:
+   - Confirmation messages, selected item names, status changes
+4. Write CLEAR action descriptions for each step
+
+CRITICAL RULES:
+- If "typedText" exists for an event, that IS user input - create a parameter for it
+- Step descriptions should be specific: "Type {comment_text} in the comment field" NOT "Interact with page"
+- Template name must be GENERIC: "Add Comment to Issue" not "Add Comment to IPC Issue"
+- Every step must have a clear, specific actionTemplate
 
 Return JSON (no markdown):
 {
   "template": {
-    "name": "Search and Add to Cart",
-    "description": "Search for a product and add it to the shopping cart",
+    "name": "Add Comment to Issue",
+    "description": "Open an issue and add a comment to it",
     "inputs": {
-      "search_query": {
+      "issue_identifier": {
         "type": "string",
-        "description": "The search term to look for",
+        "description": "The issue title or ID to open",
         "required": true
       },
-      "quantity": {
-        "type": "number",
-        "description": "Number of items to add",
-        "required": false,
-        "default": 1
+      "comment_text": {
+        "type": "string",
+        "description": "The comment content to add",
+        "required": true
       }
     },
     "outputs": {
-      "product_name": {
-        "type": "string",
-        "description": "Name of the product that was added"
+      "comment_posted": {
+        "type": "boolean",
+        "description": "Whether the comment was successfully posted"
       }
     },
     "steps": [
       {
         "stepNumber": 1,
-        "screenPattern": "Search Results",
-        "actionTemplate": "Enter {search_query} in search box",
-        "usesInputs": ["search_query"],
+        "screenPattern": "Issues List",
+        "actionTemplate": "Click on issue {issue_identifier}",
+        "usesInputs": ["issue_identifier"],
         "extracts": {}
       },
       {
         "stepNumber": 2,
-        "screenPattern": "Product Detail Page",
-        "actionTemplate": "Click on a product from search results",
+        "screenPattern": "Issue Detail",
+        "actionTemplate": "Click the comment input field",
+        "usesInputs": [],
+        "extracts": {}
+      },
+      {
+        "stepNumber": 3,
+        "screenPattern": "Issue Detail",
+        "actionTemplate": "Type {comment_text} in the comment field",
+        "usesInputs": ["comment_text"],
+        "extracts": {}
+      },
+      {
+        "stepNumber": 4,
+        "screenPattern": "Issue Detail",
+        "actionTemplate": "Click Submit/Post button",
         "usesInputs": [],
         "extracts": {
-          "product_name": { "from": "clicked_text" }
+          "comment_posted": { "from": "page_content" }
         }
       }
     ]
   },
   "instanceValues": {
     "inputs": {
-      "search_query": "iPad",
-      "quantity": 3
+      "issue_identifier": "BUG-123",
+      "comment_text": "This looks like a duplicate of the other issue"
     },
     "outputs": {
-      "product_name": "iPad Pro 11-inch"
+      "comment_posted": true
     }
   }
-}
-
-Rules:
-- Template name should be GENERIC (not "Search for iPad")
-- Parameter names should be snake_case
-- Every input mentioned in steps must be defined in inputs
-- Extract values that would be useful to know after the workflow completes`;
+}`;
 
   try {
     const response = await callLLMText(prompt);

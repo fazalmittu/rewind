@@ -6,6 +6,7 @@
  * - Input events (text typed into fields)
  * - Change events (dropdowns, checkboxes)
  * - Submit events (form submissions)
+ * - Contenteditable changes (rich text editors like Linear, Notion, etc.)
  */
 
 let sessionId: string | null = null;
@@ -13,10 +14,13 @@ let isRecording: boolean = false;
 
 // Debounce timer for input events
 let inputDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-const INPUT_DEBOUNCE_MS = 500;
+const INPUT_DEBOUNCE_MS = 800; // Increased for better text capture
 
 // Track last input values to avoid duplicates
 const lastInputValues: Map<string, string> = new Map();
+
+// Track contenteditable elements we're observing
+const observedEditables: WeakSet<Element> = new WeakSet();
 
 // Request state from background script on load
 chrome.runtime.sendMessage({ type: "GET_STATE" }, (response) => {
@@ -259,4 +263,162 @@ document.addEventListener(
   true
 );
 
-console.log("[Workflow Recorder] Content script loaded with input capture");
+// ============================================
+// CONTENTEDITABLE ELEMENTS (rich text editors)
+// ============================================
+
+// Debounce timer for contenteditable
+let contenteditableDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Get the label for a contenteditable element
+ */
+function getContenteditableLabel(el: HTMLElement): string {
+  // Check for aria-label
+  if (el.getAttribute('aria-label')) {
+    return el.getAttribute('aria-label') || '';
+  }
+  
+  // Check for placeholder
+  if (el.getAttribute('placeholder') || el.getAttribute('data-placeholder')) {
+    return el.getAttribute('placeholder') || el.getAttribute('data-placeholder') || '';
+  }
+  
+  // Check for nearby label
+  const parent = el.parentElement;
+  if (parent) {
+    const label = parent.querySelector('label');
+    if (label) return label.textContent?.trim() || '';
+  }
+  
+  // Check role
+  if (el.getAttribute('role')) {
+    return el.getAttribute('role') || '';
+  }
+  
+  return 'text editor';
+}
+
+/**
+ * Capture contenteditable content when user stops typing
+ */
+function captureContenteditable(el: HTMLElement) {
+  if (!isRecording || !sessionId) return;
+  
+  const elementId = getElementIdentifier(el);
+  const content = el.textContent?.trim() || el.innerText?.trim() || '';
+  
+  // Skip empty or very short content
+  if (!content || content.length < 2) return;
+  
+  // Skip if content hasn't changed
+  const lastValue = lastInputValues.get(elementId);
+  if (lastValue === content) return;
+  
+  lastInputValues.set(elementId, content);
+  
+  sendEvent({
+    eventType: "input",
+    url: window.location.href,
+    timestamp: Date.now(),
+    targetTag: 'contenteditable',
+    inputValue: content,
+    inputName: el.id || el.getAttribute('name') || '',
+    inputLabel: getContenteditableLabel(el),
+    inputType: 'richtext',
+  });
+  
+  console.log(`[Workflow Recorder] Contenteditable captured:`, content.slice(0, 50));
+}
+
+/**
+ * Set up observer for a contenteditable element
+ */
+function observeContenteditable(el: HTMLElement) {
+  if (observedEditables.has(el)) return;
+  observedEditables.add(el);
+  
+  // Listen for input events on contenteditable
+  el.addEventListener('input', () => {
+    if (contenteditableDebounceTimer) {
+      clearTimeout(contenteditableDebounceTimer);
+    }
+    contenteditableDebounceTimer = setTimeout(() => {
+      captureContenteditable(el);
+    }, INPUT_DEBOUNCE_MS);
+  });
+  
+  // Also capture on blur (when user clicks away)
+  el.addEventListener('blur', () => {
+    if (contenteditableDebounceTimer) {
+      clearTimeout(contenteditableDebounceTimer);
+    }
+    captureContenteditable(el);
+  });
+}
+
+// Find and observe all contenteditable elements
+function findAndObserveContenteditables() {
+  const editables = document.querySelectorAll('[contenteditable="true"], [contenteditable=""]');
+  editables.forEach((el) => {
+    observeContenteditable(el as HTMLElement);
+  });
+  
+  // Also check for common rich text editor classes
+  const editorSelectors = [
+    '.ProseMirror',           // Linear, Notion
+    '.ql-editor',             // Quill
+    '.DraftEditor-root',      // Draft.js
+    '.tiptap',                // TipTap
+    '[data-slate-editor]',    // Slate
+    '.ce-block',              // Editor.js
+    '[role="textbox"]',       // Generic
+  ];
+  
+  editorSelectors.forEach(selector => {
+    document.querySelectorAll(selector).forEach((el) => {
+      if (el instanceof HTMLElement) {
+        observeContenteditable(el);
+      }
+    });
+  });
+}
+
+// Initial scan
+findAndObserveContenteditables();
+
+// Observe DOM for new contenteditable elements
+const contentEditableObserver = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    if (mutation.type === 'childList') {
+      mutation.addedNodes.forEach((node) => {
+        if (node instanceof HTMLElement) {
+          if (node.getAttribute('contenteditable') === 'true' || 
+              node.getAttribute('contenteditable') === '') {
+            observeContenteditable(node);
+          }
+          // Also check descendants
+          node.querySelectorAll('[contenteditable="true"], [contenteditable=""]').forEach((el) => {
+            observeContenteditable(el as HTMLElement);
+          });
+        }
+      });
+    } else if (mutation.type === 'attributes' && 
+               mutation.attributeName === 'contenteditable') {
+      const el = mutation.target as HTMLElement;
+      if (el.getAttribute('contenteditable') === 'true' || 
+          el.getAttribute('contenteditable') === '') {
+        observeContenteditable(el);
+      }
+    }
+  }
+});
+
+contentEditableObserver.observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['contenteditable'],
+});
+
+console.log("[Workflow Recorder] Content script loaded with input + contenteditable capture");

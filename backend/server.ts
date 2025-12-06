@@ -21,17 +21,13 @@ export function createApp(): Express {
   app.use(express.json({ limit: "50mb" }));
 
   // Live reload in development (not during tests)
-  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
-    const liveReloadServer = livereload.createServer();
-    liveReloadServer.watch(path.join(__dirname, "..", "frontend"));
-    liveReloadServer.server.once("connection", () => {
-      setTimeout(() => {
-        liveReloadServer.refresh("/");
-      }, 100);
-    });
-    app.use(connectLivereload());
-    console.log("[LiveReload] Watching frontend/ for changes");
-  }
+  // Disabled due to port conflict issues - manually refresh browser
+  // if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
+  //   const liveReloadServer = livereload.createServer();
+  //   liveReloadServer.watch(path.join(__dirname, "..", "frontend"));
+  //   app.use(connectLivereload());
+  //   console.log("[LiveReload] Watching frontend/ for changes");
+  // }
 
   // Serve frontend static files
   app.use("/", express.static(path.join(__dirname, "..", "frontend")));
