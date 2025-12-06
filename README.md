@@ -1,6 +1,19 @@
-# Workflow Recorder
+<p align="center">
+  <img src="assets/logo.png" alt="Workflow Recorder" width="128" height="128">
+</p>
 
-A vision-only workflow recorder for browser-based applications. Records user interactions, captures screenshots, and uses GPT-4o to identify and document workflows.
+<h1 align="center">Workflow Recorder</h1>
+
+<p align="center">
+  A vision-only workflow recorder for browser-based applications.<br>
+  Records user interactions, captures screenshots, and uses AI to identify and document workflows.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Extension">
+  <img src="https://img.shields.io/badge/Node.js-Backend-339933?logo=nodedotjs&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/OpenAI-GPT--4o-412991?logo=openai&logoColor=white" alt="OpenAI">
+</p>
 
 ## Quick Start
 

@@ -373,6 +373,9 @@
         <button class="btn btn-primary" onclick="downloadJSON()" id="download-btn" style="display: none;">
           📥 Download JSON
         </button>
+        <button class="btn btn-danger" onclick="resetDatabase()" id="reset-btn">
+          Clear All Data
+        </button>
       </div>
     </div>
     <div id="workflows" class="workflow-grid">
@@ -542,6 +545,35 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    }
+
+    async function resetDatabase() {
+      const confirmed = confirm(
+        '⚠️ This will permanently delete ALL workflows, screens, and events.\n\n' +
+        'Are you sure you want to clear the database?'
+      );
+      
+      if (!confirmed) return;
+
+      const resetBtn = document.getElementById('reset-btn');
+      resetBtn.disabled = true;
+      resetBtn.textContent = 'Clearing...';
+
+      try {
+        const response = await fetch('/reset', { method: 'POST' });
+        
+        if (!response.ok) {
+          throw new Error('Failed to reset database');
+        }
+
+        alert('✅ Database cleared successfully!');
+        loadWorkflows(); // Refresh the view
+      } catch (error) {
+        alert('❌ Error: ' + error.message);
+      } finally {
+        resetBtn.disabled = false;
+        resetBtn.textContent = 'Clear All Data';
+      }
     }
 
     loadWorkflows();

@@ -328,3 +328,87 @@ export const getRawWorkflows = (sessionId: string): Promise<RawWorkflowRow[]> =>
     );
   });
 };
+
+// ============================================
+// DATABASE RESET
+// ============================================
+
+export const clearAllData = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      // Drop all tables (in correct order for foreign keys)
+      db.run(`DROP TABLE IF EXISTS refined_workflow_map`);
+      db.run(`DROP TABLE IF EXISTS refined_workflows`);
+      db.run(`DROP TABLE IF EXISTS raw_workflows`);
+      db.run(`DROP TABLE IF EXISTS events`);
+      db.run(`DROP TABLE IF EXISTS screens`);
+
+      // Recreate tables with current schema
+      db.run(`
+        CREATE TABLE IF NOT EXISTS screens (
+          id TEXT PRIMARY KEY,
+          sessionId TEXT NOT NULL,
+          label TEXT NOT NULL,
+          description TEXT NOT NULL,
+          urlPattern TEXT NOT NULL,
+          exampleScreenshotPath TEXT NOT NULL,
+          seenCount INTEGER NOT NULL DEFAULT 1,
+          createdAt INTEGER NOT NULL
+        )
+      `);
+
+      db.run(`
+        CREATE TABLE IF NOT EXISTS events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sessionId TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          url TEXT NOT NULL,
+          eventType TEXT NOT NULL,
+          screenshotPath TEXT NOT NULL,
+          screenId TEXT,
+          actionSummary TEXT NOT NULL,
+          screenSummary TEXT
+        )
+      `);
+
+      db.run(`
+        CREATE TABLE IF NOT EXISTS raw_workflows (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sessionId TEXT NOT NULL,
+          workflowJson TEXT NOT NULL,
+          createdAt INTEGER NOT NULL
+        )
+      `);
+
+      db.run(`
+        CREATE TABLE IF NOT EXISTS refined_workflows (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sessionId TEXT NOT NULL,
+          refinedJson TEXT NOT NULL,
+          createdAt INTEGER NOT NULL
+        )
+      `);
+
+      db.run(
+        `
+        CREATE TABLE IF NOT EXISTS refined_workflow_map (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          rawWorkflowId INTEGER NOT NULL,
+          refinedWorkflowId INTEGER NOT NULL,
+          FOREIGN KEY (rawWorkflowId) REFERENCES raw_workflows(id),
+          FOREIGN KEY (refinedWorkflowId) REFERENCES refined_workflows(id)
+        )
+      `,
+        (err) => {
+          if (err) {
+            console.error("Error recreating tables:", err);
+            reject(err);
+          } else {
+            console.log("[DB] All tables dropped and recreated");
+            resolve();
+          }
+        }
+      );
+    });
+  });
+};

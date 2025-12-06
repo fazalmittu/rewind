@@ -2,6 +2,8 @@ import express, { Express } from "express";
 import cors from "cors";
 import fs from "fs";
 import path from "path";
+import livereload from "livereload";
+import connectLivereload from "connect-livereload";
 import {
   insertEvent,
   insertRawWorkflow,
@@ -10,6 +12,7 @@ import {
   getAllRefinedWorkflows,
   insertScreens,
   insertSessionEvents,
+  clearAllData,
 } from "./db";
 import { sessionStore } from "./sessionStore";
 import { classifyInteraction, extractUrlPattern } from "./classifier";
@@ -23,6 +26,19 @@ export function createApp(): Express {
   // Middleware
   app.use(cors());
   app.use(express.json({ limit: "50mb" }));
+
+  // Live reload in development
+  if (process.env.NODE_ENV !== "production") {
+    const liveReloadServer = livereload.createServer();
+    liveReloadServer.watch(path.join(__dirname, "..", "frontend"));
+    liveReloadServer.server.once("connection", () => {
+      setTimeout(() => {
+        liveReloadServer.refresh("/");
+      }, 100);
+    });
+    app.use(connectLivereload());
+    console.log("[LiveReload] Watching frontend/ for changes");
+  }
 
   // Serve frontend static files
   app.use("/", express.static(path.join(__dirname, "..", "frontend")));
@@ -252,6 +268,19 @@ export function createApp(): Express {
     } catch (error) {
       console.error("Get workflows error:", error);
       res.status(500).json({ error: "Failed to get workflows" });
+    }
+  });
+
+  // Reset database - clears all data
+  app.post("/reset", async (_, res) => {
+    try {
+      await clearAllData();
+      // Also clear any active sessions from memory
+      sessionStore.clear();
+      res.json({ ok: true, message: "All data cleared" });
+    } catch (error) {
+      console.error("Reset error:", error);
+      res.status(500).json({ error: "Failed to reset database" });
     }
   });
 

@@ -156,6 +156,12 @@ async function handleFinalize() {
 startBtn.addEventListener("click", handleStart);
 finalizeBtn.addEventListener("click", handleFinalize);
 
+// Set the workflows link dynamically
+const viewWorkflowsLink = document.getElementById("viewWorkflowsLink") as HTMLAnchorElement;
+if (viewWorkflowsLink) {
+  viewWorkflowsLink.href = BACKEND_URL;
+}
+
 // Load state on popup open
 loadState();
 
