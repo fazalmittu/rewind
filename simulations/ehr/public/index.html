@@ -1,0 +1,1892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>MedChart EHR</title>
+  <style>
+    :root {
+      --primary: #0066cc;
+      --primary-hover: #0052a3;
+      --primary-light: #e6f0fa;
+      --success: #059669;
+      --success-hover: #047857;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --warning: #d97706;
+      --warning-hover: #b45309;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      --radius: 8px;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--gray-100); 
+      color: var(--gray-800);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, #004d99 100%);
+      padding: 16px 24px;
+      box-shadow: var(--shadow-md);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: white;
+    }
+    
+    .logo svg {
+      width: 36px;
+      height: 36px;
+    }
+    
+    .logo h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    
+    .logo span {
+      font-weight: 400;
+      opacity: 0.9;
+    }
+
+    /* Container */
+    .container { 
+      max-width: 1400px; 
+      margin: 0 auto; 
+      padding: 24px;
+    }
+
+    /* Buttons */
+    button {
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    button:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: white;
+    }
+    button.primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    button.secondary {
+      background: white;
+      color: var(--gray-700);
+      border: 1px solid var(--gray-300);
+    }
+    button.secondary:hover {
+      background: var(--gray-50);
+      border-color: var(--gray-400);
+    }
+
+    button.success {
+      background: var(--success);
+      color: white;
+    }
+    button.success:hover {
+      background: var(--success-hover);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    button.danger {
+      background: white;
+      color: var(--danger);
+      border: 1px solid var(--gray-200);
+    }
+    button.danger:hover {
+      background: #fef2f2;
+      border-color: var(--danger);
+    }
+
+    button.warning {
+      background: var(--warning);
+      color: white;
+    }
+    button.warning:hover {
+      background: var(--warning-hover);
+    }
+
+    button.ghost {
+      background: transparent;
+      color: var(--gray-600);
+    }
+    button.ghost:hover {
+      background: var(--gray-100);
+      color: var(--gray-800);
+    }
+
+    button.sm {
+      padding: 6px 12px;
+      font-size: 13px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      background: white;
+      padding: 6px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 24px;
+      width: fit-content;
+    }
+    
+    .nav-tab {
+      padding: 10px 20px;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--gray-600);
+      font-weight: 500;
+    }
+    
+    .nav-tab:hover {
+      background: var(--gray-100);
+      color: var(--gray-800);
+    }
+    
+    .nav-tab.active {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .nav-tab.active:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Search Bar */
+    .search-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    
+    .search-input-wrapper {
+      flex: 1;
+      min-width: 280px;
+      position: relative;
+    }
+    
+    .search-input-wrapper svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--gray-400);
+      width: 18px;
+      height: 18px;
+    }
+    
+    .search-input-wrapper input {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      font-size: 14px;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius);
+      background: white;
+      transition: all 0.15s ease;
+    }
+    
+    .search-input-wrapper input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .search-bar .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gray-800);
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--gray-200);
+      vertical-align: middle;
+    }
+
+    th {
+      background: var(--gray-50);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-600);
+    }
+
+    td {
+      font-size: 14px;
+      color: var(--gray-700);
+    }
+
+    tbody tr {
+      transition: background 0.1s ease;
+    }
+
+    tbody tr:hover {
+      background: var(--gray-50);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      height: 100%;
+    }
+    
+    td:last-child {
+      vertical-align: middle;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+    }
+    
+    .modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.15s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      max-width: 560px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      animation: slideIn 0.2s ease;
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 1;
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gray-900);
+    }
+
+    .close-btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--gray-100);
+      border-radius: 6px;
+      color: var(--gray-500);
+      font-size: 20px;
+    }
+
+    .close-btn:hover {
+      background: var(--gray-200);
+      color: var(--gray-700);
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--gray-200);
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      background: var(--gray-50);
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      font-size: 14px;
+      color: var(--gray-700);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius);
+      background: white;
+      transition: all 0.15s ease;
+      color: var(--gray-800);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* Patient Details */
+    .patient-header {
+      background: linear-gradient(135deg, var(--primary) 0%, #004d99 100%);
+      padding: 24px;
+      color: white;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .patient-header h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .patient-header p {
+      opacity: 0.9;
+      font-size: 14px;
+    }
+
+    .patient-card {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1px;
+      background: var(--gray-200);
+    }
+
+    .detail-item {
+      padding: 16px 20px;
+      background: white;
+    }
+
+    .detail-item .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-500);
+      margin-bottom: 4px;
+    }
+
+    .detail-item .value {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--gray-800);
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--gray-200);
+      padding-bottom: 0;
+    }
+
+    .tab {
+      padding: 12px 20px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      color: var(--gray-500);
+      font-weight: 500;
+      border-radius: 0;
+    }
+
+    .tab:hover {
+      color: var(--gray-700);
+      background: transparent;
+    }
+
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: transparent;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Badges */
+    .mrn-badge {
+      background: #1e40af;
+      color: #ffffff;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      letter-spacing: 0.3px;
+    }
+
+    .mrn-badge-light {
+      background: rgba(255, 255, 255, 0.95);
+      color: #1e40af;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      letter-spacing: 0.3px;
+    }
+
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .status-pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-approved {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-denied {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .status-filled {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .specialty-badge {
+      background: var(--gray-100);
+      color: var(--gray-600);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* Back Button */
+    .back-btn {
+      margin-bottom: 20px;
+      color: var(--gray-600);
+    }
+
+    .back-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Provider Select Row */
+    .provider-select-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .provider-select-row .form-group {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--gray-500);
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+      
+      .search-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .search-input-wrapper {
+        min-width: 100%;
+      }
+      
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">
+        <svg viewBox="0 0 100 100" fill="none">
+          <rect width="100" height="100" rx="20" fill="rgba(255,255,255,0.2)"/>
+          <path d="M50 25 L50 75 M25 50 L75 50" stroke="white" stroke-width="10" stroke-linecap="round"/>
+        </svg>
+        <h1>MedChart <span>EHR</span></h1>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Main Navigation -->
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showMainView('patients')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Patients
+      </button>
+      <button class="nav-tab" onclick="showMainView('providers')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Providers
+      </button>
+    </div>
+    
+    <!-- Patient List View -->
+    <div id="patientListView">
+      <div class="search-bar">
+        <div class="search-input-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="searchInput" placeholder="Search patients by name, email, or MRN...">
+        </div>
+        <div class="actions">
+          <button class="secondary" onclick="loadPatients()">Clear</button>
+          <button class="success" onclick="openCreatePatientModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            New Patient
+          </button>
+          <button class="secondary" onclick="reseedDatabase()" title="Reset to sample data" style="padding: 10px 12px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 3"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 21"/><path d="M3 21v-5h5"/></svg>
+          </button>
+        </div>
+      </div>
+      
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>MRN</th>
+              <th>Patient Name</th>
+              <th>Date of Birth</th>
+              <th>Gender</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th style="width: 120px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="patientTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Providers List View -->
+    <div id="providersListView" style="display: none;">
+      <div class="search-bar">
+        <div class="search-input-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="providerSearchInput" placeholder="Search providers by name, NPI, or specialty...">
+        </div>
+        <div class="actions">
+          <button class="secondary" onclick="loadProviders()">Clear</button>
+          <button class="success" onclick="openCreateProviderModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            New Provider
+          </button>
+        </div>
+      </div>
+      
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>NPI</th>
+              <th>Provider Name</th>
+              <th>Specialty</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th style="width: 120px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="providerTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Patient Detail View -->
+    <div id="patientDetailView" style="display: none;">
+      <button class="back-btn ghost" onclick="showPatientList()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Back to Patients
+      </button>
+      
+      <div class="patient-card">
+        <div class="patient-header" id="patientHeader"></div>
+        <div class="detail-grid" id="patientDetails"></div>
+      </div>
+      
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('demographics')">Demographics</button>
+        <button class="tab" onclick="switchTab('insurance')">Insurance</button>
+        <button class="tab" onclick="switchTab('referrals')">Drug Referrals</button>
+      </div>
+      
+      <div id="demographicsTab" class="tab-content active">
+        <div class="card">
+          <div class="card-header">
+            <h2>Patient Demographics</h2>
+            <button class="primary sm" onclick="openEditPatientModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+              Edit
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="detail-grid" id="demographicsContent"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div id="insuranceTab" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h2>Insurance Information</h2>
+            <button class="success sm" onclick="openCreateInsuranceModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              Add Insurance
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Policy #</th>
+                <th>Group #</th>
+                <th>Effective</th>
+                <th>Expires</th>
+                <th>Copay</th>
+                <th style="width: 120px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="insuranceTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div id="referralsTab" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h2>Drug Referrals</h2>
+            <button class="success sm" onclick="openCreateReferralModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              New Referral
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Drug</th>
+                <th>Dosage / Frequency</th>
+                <th>Provider</th>
+                <th>Diagnosis</th>
+                <th>Status</th>
+                <th style="width: 120px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="referralsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Create/Edit Patient Modal -->
+  <div id="patientModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="patientModalTitle">New Patient</h2>
+        <button class="close-btn" onclick="closePatientModal()">×</button>
+      </div>
+      <form id="patientForm" onsubmit="savePatient(event)">
+        <div class="modal-body">
+          <input type="hidden" id="patientId">
+          <div class="form-row">
+            <div class="form-group">
+              <label>First Name</label>
+              <input type="text" id="firstName" required>
+            </div>
+            <div class="form-group">
+              <label>Last Name</label>
+              <input type="text" id="lastName" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date of Birth</label>
+              <input type="date" id="dateOfBirth" required>
+            </div>
+            <div class="form-group">
+              <label>Gender</label>
+              <select id="gender" required>
+                <option value="">Select...</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="email" required>
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" id="phone" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" id="address" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" id="city" required>
+            </div>
+            <div class="form-group">
+              <label>State</label>
+              <input type="text" id="state" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Zip Code</label>
+            <input type="text" id="zipCode" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Emergency Contact Name</label>
+              <input type="text" id="emergencyContactName" required>
+            </div>
+            <div class="form-group">
+              <label>Emergency Contact Phone</label>
+              <input type="tel" id="emergencyContactPhone" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="secondary" onclick="closePatientModal()">Cancel</button>
+          <button type="submit" class="success">Save Patient</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Create/Edit Insurance Modal -->
+  <div id="insuranceModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="insuranceModalTitle">Add Insurance</h2>
+        <button class="close-btn" onclick="closeInsuranceModal()">×</button>
+      </div>
+      <form id="insuranceForm" onsubmit="saveInsurance(event)">
+        <div class="modal-body">
+          <input type="hidden" id="insuranceId">
+          <div class="form-group">
+            <label>Insurance Provider</label>
+            <select id="insuranceProvider" required>
+              <option value="">Select...</option>
+              <option value="Blue Cross Blue Shield">Blue Cross Blue Shield</option>
+              <option value="Aetna">Aetna</option>
+              <option value="UnitedHealthcare">UnitedHealthcare</option>
+              <option value="Cigna">Cigna</option>
+              <option value="Humana">Humana</option>
+              <option value="Kaiser Permanente">Kaiser Permanente</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Policy Number</label>
+              <input type="text" id="policyNumber" required>
+            </div>
+            <div class="form-group">
+              <label>Group Number</label>
+              <input type="text" id="groupNumber" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Subscriber Name</label>
+              <input type="text" id="subscriberName" required>
+            </div>
+            <div class="form-group">
+              <label>Relationship to Patient</label>
+              <select id="subscriberRelationship" required>
+                <option value="">Select...</option>
+                <option value="Self">Self</option>
+                <option value="Spouse">Spouse</option>
+                <option value="Child">Child</option>
+                <option value="Parent">Parent</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Effective Date</label>
+              <input type="date" id="effectiveDate" required>
+            </div>
+            <div class="form-group">
+              <label>Expiration Date</label>
+              <input type="date" id="expirationDate" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Copay ($)</label>
+              <input type="number" id="copay" step="0.01" required>
+            </div>
+            <div class="form-group">
+              <label>Deductible ($)</label>
+              <input type="number" id="deductible" step="0.01" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="secondary" onclick="closeInsuranceModal()">Cancel</button>
+          <button type="submit" class="success">Save Insurance</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Create/Edit Provider Modal -->
+  <div id="providerModal" class="modal" style="z-index: 1100;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="providerModalTitle">New Provider</h2>
+        <button class="close-btn" onclick="closeProviderModal()">×</button>
+      </div>
+      <form id="providerForm" onsubmit="saveProvider(event)">
+        <div class="modal-body">
+          <input type="hidden" id="providerId">
+          <div class="form-group">
+            <label>NPI (10 digits)</label>
+            <input type="text" id="providerNpi" pattern="[0-9]{10}" maxlength="10" placeholder="1234567890" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>First Name</label>
+              <input type="text" id="providerFirstName" required>
+            </div>
+            <div class="form-group">
+              <label>Last Name</label>
+              <input type="text" id="providerLastName" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Specialty</label>
+            <select id="providerSpecialty" required>
+              <option value="">Select...</option>
+              <option value="Internal Medicine">Internal Medicine</option>
+              <option value="Family Medicine">Family Medicine</option>
+              <option value="Cardiology">Cardiology</option>
+              <option value="Endocrinology">Endocrinology</option>
+              <option value="Psychiatry">Psychiatry</option>
+              <option value="Oncology">Oncology</option>
+              <option value="Orthopedics">Orthopedics</option>
+              <option value="Dermatology">Dermatology</option>
+              <option value="Neurology">Neurology</option>
+              <option value="Gastroenterology">Gastroenterology</option>
+              <option value="Pulmonology">Pulmonology</option>
+              <option value="Rheumatology">Rheumatology</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" id="providerPhone" required>
+            </div>
+            <div class="form-group">
+              <label>Fax</label>
+              <input type="tel" id="providerFax" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="providerEmail" required>
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" id="providerAddress" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" id="providerCity" required>
+            </div>
+            <div class="form-group">
+              <label>State</label>
+              <input type="text" id="providerState" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Zip Code</label>
+            <input type="text" id="providerZipCode" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="secondary" onclick="closeProviderModal()">Cancel</button>
+          <button type="submit" class="success">Save Provider</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Create/Edit Drug Referral Modal -->
+  <div id="referralModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="referralModalTitle">New Drug Referral</h2>
+        <button class="close-btn" onclick="closeReferralModal()">×</button>
+      </div>
+      <form id="referralForm" onsubmit="saveReferral(event)">
+        <div class="modal-body">
+          <input type="hidden" id="referralId">
+          <div class="form-group">
+            <label>Referring Provider</label>
+            <div class="provider-select-row">
+              <div class="form-group">
+                <select id="referralProviderId" required>
+                  <option value="">Select provider...</option>
+                </select>
+              </div>
+              <button type="button" class="warning sm" onclick="openCreateProviderModal(true)">+ Add</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Drug Name</label>
+              <input type="text" id="drugName" placeholder="e.g., Metformin" required>
+            </div>
+            <div class="form-group">
+              <label>Dosage</label>
+              <input type="text" id="dosage" placeholder="e.g., 500mg" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Frequency</label>
+              <select id="frequency" required>
+                <option value="">Select...</option>
+                <option value="Once daily">Once daily</option>
+                <option value="Twice daily">Twice daily</option>
+                <option value="Three times daily">Three times daily</option>
+                <option value="Four times daily">Four times daily</option>
+                <option value="Every 4 hours">Every 4 hours</option>
+                <option value="Every 6 hours">Every 6 hours</option>
+                <option value="Every 8 hours">Every 8 hours</option>
+                <option value="Every 12 hours">Every 12 hours</option>
+                <option value="As needed">As needed</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Quantity</label>
+              <input type="number" id="quantity" min="1" placeholder="30" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Refills</label>
+              <input type="number" id="refills" min="0" value="0" required>
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <select id="referralStatus" required>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="denied">Denied</option>
+                <option value="filled">Filled</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Diagnosis</label>
+            <input type="text" id="diagnosis" placeholder="e.g., Type 2 Diabetes" required>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="referralNotes" rows="3" placeholder="Additional instructions or notes..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="secondary" onclick="closeReferralModal()">Cancel</button>
+          <button type="submit" class="success">Save Referral</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3001/api';
+    let currentPatient = null;
+    let patients = [];
+    let providers = [];
+    let referralModalCallback = null;
+
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPatients();
+      loadProvidersData();
+    });
+
+    // ============================================
+    // MAIN NAVIGATION
+    // ============================================
+    
+    function showMainView(view) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      event.target.closest('.nav-tab').classList.add('active');
+      
+      document.getElementById('patientListView').style.display = view === 'patients' ? 'block' : 'none';
+      document.getElementById('providersListView').style.display = view === 'providers' ? 'block' : 'none';
+      document.getElementById('patientDetailView').style.display = 'none';
+      
+      if (view === 'providers') loadProviders();
+    }
+
+    // ============================================
+    // PATIENTS
+    // ============================================
+
+    async function loadPatients() {
+      try {
+        const res = await fetch(`${API_BASE}/patients`);
+        patients = await res.json();
+        renderPatientTable();
+      } catch (err) {
+        console.error('Error loading patients:', err);
+        alert('Failed to load patients');
+      }
+    }
+
+    async function searchPatients() {
+      const query = document.getElementById('searchInput').value;
+      if (!query) {
+        loadPatients();
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/patients?search=${encodeURIComponent(query)}`);
+        patients = await res.json();
+        renderPatientTable();
+      } catch (err) {
+        console.error('Error searching patients:', err);
+      }
+    }
+
+    function renderPatientTable() {
+      const tbody = document.getElementById('patientTableBody');
+      if (patients.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 48px; color: var(--gray-500);">No patients found</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = patients.map(p => `
+        <tr>
+          <td><span class="mrn-badge">${p.mrn}</span></td>
+          <td style="font-weight: 500;">${p.lastName}, ${p.firstName}</td>
+          <td>${p.dateOfBirth}</td>
+          <td>${p.gender}</td>
+          <td>${p.phone}</td>
+          <td>${p.email}</td>
+          <td class="table-actions">
+            <button class="primary sm" onclick="viewPatient('${p.id}')">View</button>
+            <button class="danger sm" onclick="deletePatient('${p.id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function viewPatient(id) {
+      try {
+        const res = await fetch(`${API_BASE}/patients/${id}`);
+        currentPatient = await res.json();
+        showPatientDetail();
+        loadPatientInsurance();
+        loadPatientReferrals();
+      } catch (err) {
+        console.error('Error loading patient:', err);
+      }
+    }
+
+    function showPatientDetail() {
+      document.getElementById('patientListView').style.display = 'none';
+      document.getElementById('providersListView').style.display = 'none';
+      document.getElementById('patientDetailView').style.display = 'block';
+      
+      const p = currentPatient;
+      document.getElementById('patientHeader').innerHTML = `
+        <h2><span class="mrn-badge-light">${p.mrn}</span> ${p.firstName} ${p.lastName}</h2>
+        <p>DOB: ${p.dateOfBirth} · ${p.gender} · ${p.phone}</p>
+      `;
+      
+      document.getElementById('patientDetails').innerHTML = `
+        <div class="detail-item"><div class="label">Email</div><div class="value">${p.email}</div></div>
+        <div class="detail-item"><div class="label">Phone</div><div class="value">${p.phone}</div></div>
+        <div class="detail-item"><div class="label">Address</div><div class="value">${p.address}, ${p.city}, ${p.state} ${p.zipCode}</div></div>
+        <div class="detail-item"><div class="label">Emergency Contact</div><div class="value">${p.emergencyContactName} · ${p.emergencyContactPhone}</div></div>
+      `;
+      
+      document.getElementById('demographicsContent').innerHTML = `
+        <div class="detail-item"><div class="label">MRN</div><div class="value">${p.mrn}</div></div>
+        <div class="detail-item"><div class="label">Full Name</div><div class="value">${p.firstName} ${p.lastName}</div></div>
+        <div class="detail-item"><div class="label">Date of Birth</div><div class="value">${p.dateOfBirth}</div></div>
+        <div class="detail-item"><div class="label">Gender</div><div class="value">${p.gender}</div></div>
+        <div class="detail-item"><div class="label">Email</div><div class="value">${p.email}</div></div>
+        <div class="detail-item"><div class="label">Phone</div><div class="value">${p.phone}</div></div>
+        <div class="detail-item"><div class="label">Street Address</div><div class="value">${p.address}</div></div>
+        <div class="detail-item"><div class="label">City</div><div class="value">${p.city}</div></div>
+        <div class="detail-item"><div class="label">State</div><div class="value">${p.state}</div></div>
+        <div class="detail-item"><div class="label">Zip Code</div><div class="value">${p.zipCode}</div></div>
+        <div class="detail-item"><div class="label">Emergency Contact</div><div class="value">${p.emergencyContactName}</div></div>
+        <div class="detail-item"><div class="label">Emergency Phone</div><div class="value">${p.emergencyContactPhone}</div></div>
+      `;
+      
+      // Reset tabs
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelector('.tab').classList.add('active');
+      document.getElementById('demographicsTab').classList.add('active');
+    }
+
+    function showPatientList() {
+      document.getElementById('patientDetailView').style.display = 'none';
+      document.getElementById('patientListView').style.display = 'block';
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector('.nav-tab').classList.add('active');
+      currentPatient = null;
+      loadPatients();
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tab + 'Tab').classList.add('active');
+    }
+
+    // Patient Modal Functions
+    function openCreatePatientModal() {
+      document.getElementById('patientModalTitle').textContent = 'New Patient';
+      document.getElementById('patientForm').reset();
+      document.getElementById('patientId').value = '';
+      document.getElementById('patientModal').classList.add('active');
+    }
+
+    function openEditPatientModal() {
+      const p = currentPatient;
+      document.getElementById('patientModalTitle').textContent = 'Edit Patient';
+      document.getElementById('patientId').value = p.id;
+      document.getElementById('firstName').value = p.firstName;
+      document.getElementById('lastName').value = p.lastName;
+      document.getElementById('dateOfBirth').value = p.dateOfBirth;
+      document.getElementById('gender').value = p.gender;
+      document.getElementById('email').value = p.email;
+      document.getElementById('phone').value = p.phone;
+      document.getElementById('address').value = p.address;
+      document.getElementById('city').value = p.city;
+      document.getElementById('state').value = p.state;
+      document.getElementById('zipCode').value = p.zipCode;
+      document.getElementById('emergencyContactName').value = p.emergencyContactName;
+      document.getElementById('emergencyContactPhone').value = p.emergencyContactPhone;
+      document.getElementById('patientModal').classList.add('active');
+    }
+
+    function closePatientModal() {
+      document.getElementById('patientModal').classList.remove('active');
+    }
+
+    async function savePatient(e) {
+      e.preventDefault();
+      const id = document.getElementById('patientId').value;
+      const data = {
+        firstName: document.getElementById('firstName').value,
+        lastName: document.getElementById('lastName').value,
+        dateOfBirth: document.getElementById('dateOfBirth').value,
+        gender: document.getElementById('gender').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        address: document.getElementById('address').value,
+        city: document.getElementById('city').value,
+        state: document.getElementById('state').value,
+        zipCode: document.getElementById('zipCode').value,
+        emergencyContactName: document.getElementById('emergencyContactName').value,
+        emergencyContactPhone: document.getElementById('emergencyContactPhone').value,
+      };
+
+      try {
+        if (id) {
+          const res = await fetch(`${API_BASE}/patients/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          currentPatient = await res.json();
+          showPatientDetail();
+        } else {
+          await fetch(`${API_BASE}/patients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          loadPatients();
+        }
+        closePatientModal();
+      } catch (err) {
+        console.error('Error saving patient:', err);
+        alert('Failed to save patient');
+      }
+    }
+
+    async function deletePatient(id) {
+      if (!confirm('Delete this patient? This will also delete their insurance and referral records.')) return;
+      try {
+        await fetch(`${API_BASE}/patients/${id}`, { method: 'DELETE' });
+        loadPatients();
+      } catch (err) {
+        console.error('Error deleting patient:', err);
+        alert('Failed to delete patient');
+      }
+    }
+
+    // ============================================
+    // INSURANCE
+    // ============================================
+
+    async function loadPatientInsurance() {
+      if (!currentPatient) return;
+      try {
+        const res = await fetch(`${API_BASE}/patients/${currentPatient.id}/insurance`);
+        const insurance = await res.json();
+        renderInsuranceTable(insurance);
+      } catch (err) {
+        console.error('Error loading insurance:', err);
+      }
+    }
+
+    function renderInsuranceTable(insurance) {
+      const tbody = document.getElementById('insuranceTableBody');
+      if (insurance.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 48px; color: var(--gray-500);">No insurance records</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = insurance.map(i => `
+        <tr>
+          <td style="font-weight: 500;">${i.provider}</td>
+          <td><code style="background: var(--gray-100); padding: 2px 6px; border-radius: 4px;">${i.policyNumber}</code></td>
+          <td>${i.groupNumber}</td>
+          <td>${i.effectiveDate}</td>
+          <td>${i.expirationDate}</td>
+          <td>$${i.copay}</td>
+          <td class="table-actions">
+            <button class="primary sm" onclick="editInsurance('${i.id}')">Edit</button>
+            <button class="danger sm" onclick="deleteInsurance('${i.id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openCreateInsuranceModal() {
+      document.getElementById('insuranceModalTitle').textContent = 'Add Insurance';
+      document.getElementById('insuranceForm').reset();
+      document.getElementById('insuranceId').value = '';
+      document.getElementById('insuranceModal').classList.add('active');
+    }
+
+    async function editInsurance(id) {
+      try {
+        const res = await fetch(`${API_BASE}/insurance/${id}`);
+        const ins = await res.json();
+        
+        document.getElementById('insuranceModalTitle').textContent = 'Edit Insurance';
+        document.getElementById('insuranceId').value = ins.id;
+        document.getElementById('insuranceProvider').value = ins.provider;
+        document.getElementById('policyNumber').value = ins.policyNumber;
+        document.getElementById('groupNumber').value = ins.groupNumber;
+        document.getElementById('subscriberName').value = ins.subscriberName;
+        document.getElementById('subscriberRelationship').value = ins.subscriberRelationship;
+        document.getElementById('effectiveDate').value = ins.effectiveDate;
+        document.getElementById('expirationDate').value = ins.expirationDate;
+        document.getElementById('copay').value = ins.copay;
+        document.getElementById('deductible').value = ins.deductible;
+        document.getElementById('insuranceModal').classList.add('active');
+      } catch (err) {
+        console.error('Error loading insurance:', err);
+      }
+    }
+
+    function closeInsuranceModal() {
+      document.getElementById('insuranceModal').classList.remove('active');
+    }
+
+    async function saveInsurance(e) {
+      e.preventDefault();
+      const id = document.getElementById('insuranceId').value;
+      const data = {
+        provider: document.getElementById('insuranceProvider').value,
+        policyNumber: document.getElementById('policyNumber').value,
+        groupNumber: document.getElementById('groupNumber').value,
+        subscriberName: document.getElementById('subscriberName').value,
+        subscriberRelationship: document.getElementById('subscriberRelationship').value,
+        effectiveDate: document.getElementById('effectiveDate').value,
+        expirationDate: document.getElementById('expirationDate').value,
+        copay: parseFloat(document.getElementById('copay').value),
+        deductible: parseFloat(document.getElementById('deductible').value),
+      };
+
+      try {
+        if (id) {
+          await fetch(`${API_BASE}/insurance/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        } else {
+          await fetch(`${API_BASE}/patients/${currentPatient.id}/insurance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        }
+        closeInsuranceModal();
+        loadPatientInsurance();
+      } catch (err) {
+        console.error('Error saving insurance:', err);
+        alert('Failed to save insurance');
+      }
+    }
+
+    async function deleteInsurance(id) {
+      if (!confirm('Delete this insurance record?')) return;
+      try {
+        await fetch(`${API_BASE}/insurance/${id}`, { method: 'DELETE' });
+        loadPatientInsurance();
+      } catch (err) {
+        console.error('Error deleting insurance:', err);
+        alert('Failed to delete insurance');
+      }
+    }
+
+    // ============================================
+    // PROVIDERS
+    // ============================================
+
+    async function loadProvidersData() {
+      try {
+        const res = await fetch(`${API_BASE}/providers`);
+        providers = await res.json();
+      } catch (err) {
+        console.error('Error loading providers:', err);
+      }
+    }
+
+    async function loadProviders() {
+      try {
+        const res = await fetch(`${API_BASE}/providers`);
+        providers = await res.json();
+        renderProviderTable();
+      } catch (err) {
+        console.error('Error loading providers:', err);
+      }
+    }
+
+    async function searchProvidersInList() {
+      const query = document.getElementById('providerSearchInput').value;
+      if (!query) {
+        loadProviders();
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/providers?search=${encodeURIComponent(query)}`);
+        providers = await res.json();
+        renderProviderTable();
+      } catch (err) {
+        console.error('Error searching providers:', err);
+      }
+    }
+
+    function renderProviderTable() {
+      const tbody = document.getElementById('providerTableBody');
+      if (providers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 48px; color: var(--gray-500);">No providers found</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = providers.map(p => `
+        <tr>
+          <td><code style="background: var(--gray-100); padding: 2px 6px; border-radius: 4px;">${p.npi}</code></td>
+          <td style="font-weight: 500;">Dr. ${p.firstName} ${p.lastName}</td>
+          <td><span class="specialty-badge">${p.specialty}</span></td>
+          <td>${p.phone}</td>
+          <td>${p.email}</td>
+          <td class="table-actions">
+            <button class="primary sm" onclick="editProvider('${p.id}')">Edit</button>
+            <button class="danger sm" onclick="deleteProvider('${p.id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function populateProviderDropdown() {
+      const select = document.getElementById('referralProviderId');
+      const currentValue = select.value;
+      select.innerHTML = '<option value="">Select provider...</option>' + 
+        providers.map(p => `<option value="${p.id}">Dr. ${p.lastName}, ${p.firstName} (${p.npi}) – ${p.specialty}</option>`).join('');
+      if (currentValue) select.value = currentValue;
+    }
+
+    function openCreateProviderModal(fromReferral = false) {
+      document.getElementById('providerModalTitle').textContent = 'New Provider';
+      document.getElementById('providerForm').reset();
+      document.getElementById('providerId').value = '';
+      document.getElementById('providerModal').classList.add('active');
+      
+      if (fromReferral) {
+        referralModalCallback = async (newProvider) => {
+          await loadProvidersData();
+          populateProviderDropdown();
+          document.getElementById('referralProviderId').value = newProvider.id;
+        };
+      } else {
+        referralModalCallback = null;
+      }
+    }
+
+    async function editProvider(id) {
+      try {
+        const res = await fetch(`${API_BASE}/providers/${id}`);
+        const p = await res.json();
+        
+        document.getElementById('providerModalTitle').textContent = 'Edit Provider';
+        document.getElementById('providerId').value = p.id;
+        document.getElementById('providerNpi').value = p.npi;
+        document.getElementById('providerFirstName').value = p.firstName;
+        document.getElementById('providerLastName').value = p.lastName;
+        document.getElementById('providerSpecialty').value = p.specialty;
+        document.getElementById('providerPhone').value = p.phone;
+        document.getElementById('providerFax').value = p.fax;
+        document.getElementById('providerEmail').value = p.email;
+        document.getElementById('providerAddress').value = p.address;
+        document.getElementById('providerCity').value = p.city;
+        document.getElementById('providerState').value = p.state;
+        document.getElementById('providerZipCode').value = p.zipCode;
+        document.getElementById('providerModal').classList.add('active');
+        referralModalCallback = null;
+      } catch (err) {
+        console.error('Error loading provider:', err);
+      }
+    }
+
+    function closeProviderModal() {
+      document.getElementById('providerModal').classList.remove('active');
+      referralModalCallback = null;
+    }
+
+    async function saveProvider(e) {
+      e.preventDefault();
+      const id = document.getElementById('providerId').value;
+      const data = {
+        npi: document.getElementById('providerNpi').value,
+        firstName: document.getElementById('providerFirstName').value,
+        lastName: document.getElementById('providerLastName').value,
+        specialty: document.getElementById('providerSpecialty').value,
+        phone: document.getElementById('providerPhone').value,
+        fax: document.getElementById('providerFax').value,
+        email: document.getElementById('providerEmail').value,
+        address: document.getElementById('providerAddress').value,
+        city: document.getElementById('providerCity').value,
+        state: document.getElementById('providerState').value,
+        zipCode: document.getElementById('providerZipCode').value,
+      };
+
+      try {
+        let res;
+        if (id) {
+          res = await fetch(`${API_BASE}/providers/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        } else {
+          res = await fetch(`${API_BASE}/providers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        }
+        
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Failed to save provider');
+        }
+        
+        const newProvider = await res.json();
+        const callback = referralModalCallback;
+        closeProviderModal();
+        
+        if (callback) {
+          await callback(newProvider);
+        } else {
+          loadProviders();
+        }
+      } catch (err) {
+        console.error('Error saving provider:', err);
+        alert(err.message || 'Failed to save provider');
+      }
+    }
+
+    async function deleteProvider(id) {
+      if (!confirm('Delete this provider?')) return;
+      try {
+        await fetch(`${API_BASE}/providers/${id}`, { method: 'DELETE' });
+        loadProviders();
+        loadProvidersData();
+      } catch (err) {
+        console.error('Error deleting provider:', err);
+        alert('Failed to delete provider');
+      }
+    }
+
+    // ============================================
+    // DRUG REFERRALS
+    // ============================================
+
+    async function loadPatientReferrals() {
+      if (!currentPatient) return;
+      try {
+        const res = await fetch(`${API_BASE}/patients/${currentPatient.id}/referrals`);
+        const referrals = await res.json();
+        renderReferralsTable(referrals);
+      } catch (err) {
+        console.error('Error loading referrals:', err);
+      }
+    }
+
+    function renderReferralsTable(referrals) {
+      const tbody = document.getElementById('referralsTableBody');
+      if (referrals.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 48px; color: var(--gray-500);">No drug referrals</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = referrals.map(r => {
+        const provider = providers.find(p => p.id === r.providerId);
+        const providerName = provider ? `Dr. ${provider.lastName}` : 'Unknown';
+        const statusClass = `status-${r.status}`;
+        return `
+          <tr>
+            <td style="font-weight: 500;">${r.drugName}</td>
+            <td>${r.dosage} · ${r.frequency}</td>
+            <td>${providerName}</td>
+            <td>${r.diagnosis}</td>
+            <td><span class="status-badge ${statusClass}">${r.status}</span></td>
+            <td class="table-actions">
+              <button class="primary sm" onclick="editReferral('${r.id}')">Edit</button>
+              <button class="danger sm" onclick="deleteReferral('${r.id}')">Delete</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openCreateReferralModal() {
+      document.getElementById('referralModalTitle').textContent = 'New Drug Referral';
+      document.getElementById('referralForm').reset();
+      document.getElementById('referralId').value = '';
+      document.getElementById('referralStatus').value = 'pending';
+      populateProviderDropdown();
+      document.getElementById('referralModal').classList.add('active');
+    }
+
+    async function editReferral(id) {
+      try {
+        const res = await fetch(`${API_BASE}/referrals/${id}`);
+        const r = await res.json();
+        
+        document.getElementById('referralModalTitle').textContent = 'Edit Drug Referral';
+        document.getElementById('referralId').value = r.id;
+        populateProviderDropdown();
+        document.getElementById('referralProviderId').value = r.providerId;
+        document.getElementById('drugName').value = r.drugName;
+        document.getElementById('dosage').value = r.dosage;
+        document.getElementById('frequency').value = r.frequency;
+        document.getElementById('quantity').value = r.quantity;
+        document.getElementById('refills').value = r.refills;
+        document.getElementById('referralStatus').value = r.status;
+        document.getElementById('diagnosis').value = r.diagnosis;
+        document.getElementById('referralNotes').value = r.notes;
+        document.getElementById('referralModal').classList.add('active');
+      } catch (err) {
+        console.error('Error loading referral:', err);
+      }
+    }
+
+    function closeReferralModal() {
+      document.getElementById('referralModal').classList.remove('active');
+    }
+
+    async function saveReferral(e) {
+      e.preventDefault();
+      const id = document.getElementById('referralId').value;
+      const data = {
+        providerId: document.getElementById('referralProviderId').value,
+        drugName: document.getElementById('drugName').value,
+        dosage: document.getElementById('dosage').value,
+        frequency: document.getElementById('frequency').value,
+        quantity: parseInt(document.getElementById('quantity').value),
+        refills: parseInt(document.getElementById('refills').value),
+        status: document.getElementById('referralStatus').value,
+        diagnosis: document.getElementById('diagnosis').value,
+        notes: document.getElementById('referralNotes').value || '',
+      };
+
+      try {
+        if (id) {
+          await fetch(`${API_BASE}/referrals/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        } else {
+          await fetch(`${API_BASE}/patients/${currentPatient.id}/referrals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        }
+        closeReferralModal();
+        loadPatientReferrals();
+      } catch (err) {
+        console.error('Error saving referral:', err);
+        alert('Failed to save referral');
+      }
+    }
+
+    async function deleteReferral(id) {
+      if (!confirm('Delete this drug referral?')) return;
+      try {
+        await fetch(`${API_BASE}/referrals/${id}`, { method: 'DELETE' });
+        loadPatientReferrals();
+      } catch (err) {
+        console.error('Error deleting referral:', err);
+        alert('Failed to delete referral');
+      }
+    }
+
+    // ============================================
+    // ADMIN
+    // ============================================
+
+    async function reseedDatabase() {
+      if (!confirm('This will reset all data to sample data. Continue?')) return;
+      try {
+        await fetch(`${API_BASE}/admin/reseed`, { method: 'POST' });
+        loadPatients();
+        loadProvidersData();
+        alert('Database reset successfully');
+      } catch (err) {
+        console.error('Error reseeding:', err);
+        alert('Failed to reset database');
+      }
+    }
+
+    // Handle Enter key in search
+    document.getElementById('searchInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') searchPatients();
+    });
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      if (!e.target.value) loadPatients();
+    });
+    document.getElementById('providerSearchInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') searchProvidersInList();
+    });
+    document.getElementById('providerSearchInput').addEventListener('input', (e) => {
+      if (!e.target.value) loadProviders();
+    });
+  </script>
+</body>
+</html>
