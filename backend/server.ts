@@ -32,6 +32,9 @@ export function createApp(): Express {
   // Serve frontend static files
   app.use("/", express.static(path.join(__dirname, "..", "frontend")));
 
+  // Serve assets (logo, etc.)
+  app.use("/assets", express.static(path.join(__dirname, "..", "assets")));
+
   // Serve screenshots
   app.use("/screenshots", express.static(path.join(__dirname, "..", "storage", "screenshots")));
 

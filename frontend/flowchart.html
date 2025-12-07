@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Rewind Works</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a1a;
+      --text-secondary: #666666;
+      --text-muted: #999999;
+      --border: #e5e5e5;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --green: #10b981;
+      --green-light: #ecfdf5;
+      --purple: #8b5cf6;
+      --purple-light: #f5f3ff;
+      --orange: #f59e0b;
+      --orange-light: #fffbeb;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3rem 2rem;
+    }
+
+    .container {
+      max-width: 1000px;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    /* Flow */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Phase */
+    .phase {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.5rem;
+    }
+
+    .phase-number {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .phase-content {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .phase-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .phase-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .phase-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Phase colors */
+    .phase-record .phase-number {
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+    .phase-record .phase-content {
+      border-color: var(--accent);
+      border-width: 2px;
+    }
+
+    .phase-process .phase-number {
+      background: var(--purple-light);
+      color: var(--purple);
+    }
+    .phase-process .phase-content {
+      border-color: var(--purple);
+      border-width: 2px;
+    }
+
+    .phase-output .phase-number {
+      background: var(--green-light);
+      color: var(--green);
+    }
+    .phase-output .phase-content {
+      border-color: var(--green);
+      border-width: 2px;
+    }
+
+    /* Items grid */
+    .items {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .item {
+      background: #fafafa;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .item-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .item-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .item-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Pipeline steps */
+    .pipeline {
+      display: flex;
+      gap: 0.5rem;
+      align-items: stretch;
+    }
+
+    .pipeline-step {
+      flex: 1;
+      background: #fafafa;
+      border-radius: 8px;
+      padding: 1rem;
+      position: relative;
+    }
+
+    .pipeline-step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 1.25rem;
+    }
+
+    .step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--purple);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .step-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Output cards */
+    .outputs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+    }
+
+    .output-card {
+      background: #fafafa;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .output-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--green);
+    }
+
+    .output-example {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.5rem;
+      color: var(--text-secondary);
+    }
+
+    /* Arrow connector */
+    .arrow {
+      display: flex;
+      justify-content: center;
+      padding: 0.5rem 0;
+      padding-left: 4rem;
+    }
+
+    .arrow svg {
+      width: 24px;
+      height: 24px;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>How Rewind Works</h1>
+      <p>Vision-based workflow recording for browser applications</p>
+    </div>
+
+    <div class="flow">
+      <!-- Phase 1: Record -->
+      <div class="phase phase-record">
+        <div class="phase-number">1</div>
+        <div class="phase-content">
+          <div class="phase-header">
+            <div>
+              <div class="phase-title">Record</div>
+              <div class="phase-subtitle">Chrome extension captures everything</div>
+            </div>
+          </div>
+          <div class="items">
+            <div class="item">
+              <div class="item-title">Clicks</div>
+              <div class="item-desc">Button presses, link clicks, selections</div>
+            </div>
+            <div class="item">
+              <div class="item-title">Inputs</div>
+              <div class="item-desc">Text typed into fields and forms</div>
+            </div>
+            <div class="item">
+              <div class="item-title">Screenshots</div>
+              <div class="item-desc">Visual state after each action</div>
+            </div>
+            <div class="item">
+              <div class="item-title">Metadata</div>
+              <div class="item-desc">URLs, timestamps, element info</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+        </svg>
+      </div>
+
+      <!-- Phase 2: Process -->
+      <div class="phase phase-process">
+        <div class="phase-number">2</div>
+        <div class="phase-content">
+          <div class="phase-header">
+            <div>
+              <div class="phase-title">Process</div>
+              <div class="phase-subtitle">AI pipeline extracts structure</div>
+            </div>
+          </div>
+          <div class="pipeline">
+            <div class="pipeline-step">
+              <div class="step-num">STAGE 1</div>
+              <div class="step-title">Canonicalize</div>
+              <div class="step-desc">Group similar screens into types</div>
+            </div>
+            <div class="pipeline-step">
+              <div class="step-num">STAGE 2</div>
+              <div class="step-title">Segment</div>
+              <div class="step-desc">Identify distinct workflow instances</div>
+            </div>
+            <div class="pipeline-step">
+              <div class="step-num">STAGE 3</div>
+              <div class="step-title">Synthesize</div>
+              <div class="step-desc">Generate templates with parameters</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+        </svg>
+      </div>
+
+      <!-- Phase 3: Output -->
+      <div class="phase phase-output">
+        <div class="phase-number">3</div>
+        <div class="phase-content">
+          <div class="phase-header">
+            <div>
+              <div class="phase-title">Output</div>
+              <div class="phase-subtitle">Structured workflow data</div>
+            </div>
+          </div>
+          <div class="outputs">
+            <div class="output-card">
+              <div class="output-title">Screens</div>
+              <div class="output-example">
+                "Patient Detail Page"<br>
+                "Search Results"<br>
+                "Dashboard"
+              </div>
+            </div>
+            <div class="output-card">
+              <div class="output-title">Templates</div>
+              <div class="output-example">
+                name: "Create Patient"<br>
+                inputs: [name, dob]<br>
+                steps: [...]
+              </div>
+            </div>
+            <div class="output-card">
+              <div class="output-title">Instances</div>
+              <div class="output-example">
+                template: "Create Patient"<br>
+                inputs: {name: "John"}<br>
+                timestamp: ...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <a href="https://github.com/fazalmittu/rewind">github.com/fazalmittu/rewind</a>
+    </div>
+  </div>
+</body>
+</html>
+
