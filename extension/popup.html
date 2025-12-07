@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Workflow Recorder</title>
+  <title>Rewind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -12,53 +15,42 @@
     }
 
     body {
-      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      width: 320px;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #e8e8e8;
-      padding: 1.5rem;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      width: 300px;
+      background: #ffffff;
+      color: #1a1a1a;
+      padding: 1.25rem;
     }
 
     .header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .logo {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
+      margin-bottom: 1.25rem;
     }
 
     h1 {
-      font-size: 1.1rem;
-      font-weight: 600;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
     }
 
     .status {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.75rem 1rem;
+      padding: 0.625rem 0.875rem;
       border-radius: 8px;
       margin-bottom: 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
     }
 
     .status.recording {
-      background: rgba(0, 255, 136, 0.1);
-      border: 1px solid rgba(0, 255, 136, 0.2);
+      background: #ecfdf5;
+      color: #059669;
     }
 
     .status.idle {
-      background: rgba(139, 146, 176, 0.1);
-      border: 1px solid rgba(139, 146, 176, 0.2);
+      background: #f5f5f5;
+      color: #666666;
     }
 
     .status-dot {
@@ -68,140 +60,119 @@
     }
 
     .status-dot.recording {
-      background: #00ff88;
+      background: #059669;
       animation: pulse 2s infinite;
     }
 
     .status-dot.idle {
-      background: #8892b0;
+      background: #999999;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .status-text {
-      font-size: 0.9rem;
-    }
-
-    .status.recording .status-text {
-      color: #00ff88;
-    }
-
-    .status.idle .status-text {
-      color: #8892b0;
+      50% { opacity: 0.4; }
     }
 
     .session-info {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #f9fafb;
+      border: 1px solid #e5e5e5;
       border-radius: 8px;
-      padding: 1rem;
+      padding: 0.75rem;
       margin-bottom: 1rem;
       display: none;
     }
 
     .session-label {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #8892b0;
+      letter-spacing: 0.05em;
+      color: #999999;
       margin-bottom: 0.25rem;
+      font-weight: 600;
     }
 
     .session-id {
-      font-family: 'SF Mono', monospace;
-      font-size: 0.85rem;
-      color: #00d9ff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #1a1a1a;
       word-break: break-all;
     }
 
     .btn {
       width: 100%;
-      padding: 0.875rem 1rem;
+      padding: 0.75rem 1rem;
       border: none;
       border-radius: 8px;
-      font-size: 0.95rem;
+      font-size: 0.875rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       margin-bottom: 0.5rem;
     }
 
     .btn-start {
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
-      color: #1a1a2e;
+      background: #1a1a1a;
+      color: white;
     }
 
     .btn-start:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 217, 255, 0.3);
+      background: #333333;
     }
 
     .btn-stop {
-      background: linear-gradient(135deg, #ff4757, #ff6b81);
+      background: #dc2626;
       color: white;
       display: none;
     }
 
     .btn-stop:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
-    }
-
-    .btn:active {
-      transform: translateY(0);
+      background: #b91c1c;
     }
 
     .btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
-      transform: none;
     }
 
     .message {
       margin-top: 0.5rem;
-      padding: 0.75rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
+      padding: 0.625rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
       text-align: center;
       display: none;
     }
 
     .message.success {
-      background: rgba(0, 255, 136, 0.1);
-      border: 1px solid rgba(0, 255, 136, 0.2);
-      color: #00ff88;
+      background: #ecfdf5;
+      color: #059669;
     }
 
     .message.error {
-      background: rgba(255, 71, 87, 0.1);
-      border: 1px solid rgba(255, 71, 87, 0.2);
-      color: #ff6b81;
+      background: #fef2f2;
+      color: #dc2626;
     }
 
     .footer {
-      margin-top: 1.5rem;
+      margin-top: 1.25rem;
       text-align: center;
     }
 
     .footer a {
-      color: #8892b0;
-      font-size: 0.8rem;
+      color: #666666;
+      font-size: 0.75rem;
       text-decoration: none;
-      transition: color 0.2s;
+      font-weight: 500;
     }
 
     .footer a:hover {
-      color: #00d9ff;
+      color: #1a1a1a;
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">📹</div>
-    <h1>Workflow Recorder</h1>
+    <h1>Rewind</h1>
   </div>
 
   <div class="status idle" id="statusContainer">
@@ -215,17 +186,17 @@
   </div>
 
   <button class="btn btn-start" id="startBtn">
-    ▶️ Start Recording
+    Start Recording
   </button>
 
   <button class="btn btn-stop" id="finalizeBtn">
-    ⏹️ Stop & Finalize
+    Stop & Finalize
   </button>
 
   <div id="message" class="message"></div>
 
   <div class="footer">
-    <a href="#" id="viewWorkflowsLink" target="_blank">View Workflows →</a>
+    <a href="#" id="viewWorkflowsLink" target="_blank">View Workflows</a>
   </div>
 
   <script src="dist/popup.js"></script>

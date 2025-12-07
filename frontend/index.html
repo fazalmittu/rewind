@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Workflow Recorder</title>
+  <title>Rewind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -11,271 +14,299 @@
       box-sizing: border-box;
     }
 
+    :root {
+      --bg: #fafafa;
+      --card-bg: #ffffff;
+      --text: #1a1a1a;
+      --text-secondary: #666666;
+      --text-muted: #999999;
+      --border: #e5e5e5;
+      --border-light: #f0f0f0;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+    }
+
     body {
-      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-      min-height: 100vh;
-      color: #e8e8e8;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }
 
     .container {
-      max-width: 1000px;
+      max-width: 860px;
       margin: 0 auto;
-      padding: 2rem;
+      padding: 3rem 2rem;
     }
 
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      background: linear-gradient(90deg, #00d9ff, #00ff88);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .subtitle {
-      color: #8892b0;
-      margin-bottom: 0.5rem;
-      font-size: 1.1rem;
-    }
-
+    /* Header */
     .header {
+      margin-bottom: 3rem;
+    }
+
+    .header-top {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 1rem;
+      margin-bottom: 0.25rem;
     }
 
-    .header-left { flex: 1; }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
 
     .header-actions {
       display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
       gap: 0.5rem;
-      padding: 0.75rem 1.25rem;
-      border-radius: 8px;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
       font-size: 0.9rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: none;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
-      color: #1a1a2e;
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
-    }
-
-    .btn-danger {
-      background: rgba(255, 77, 77, 0.1);
-      color: #ff6b6b;
-      border: 1px solid rgba(255, 77, 77, 0.3);
-    }
-
-    .btn-danger:hover {
-      background: rgba(255, 77, 77, 0.2);
     }
 
     .stats {
-      font-size: 0.85rem;
-      color: #6b7280;
-      margin-top: 0.5rem;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 0.875rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      color: var(--text);
+    }
+
+    .btn:hover {
+      border-color: var(--text-muted);
+    }
+
+    .btn-primary {
+      background: var(--text);
+      color: white;
+      border-color: var(--text);
+    }
+
+    .btn-primary:hover {
+      background: #333;
+    }
+
+    .btn-danger {
+      color: #dc2626;
+      border-color: #fecaca;
+    }
+
+    .btn-danger:hover {
+      background: #fef2f2;
     }
 
     /* Template Cards */
     .template-grid {
-      display: grid;
-      gap: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
     }
 
     .template-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
       padding: 1.5rem;
-      backdrop-filter: blur(10px);
-      transition: all 0.3s ease;
-    }
-
-    .template-card:hover {
-      border-color: rgba(0, 217, 255, 0.3);
     }
 
     .template-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
     }
 
     .template-name {
-      font-size: 1.25rem;
+      font-size: 1.1rem;
       font-weight: 600;
-      color: #fff;
+      letter-spacing: -0.01em;
     }
 
-    .template-badge {
-      font-size: 0.75rem;
-      padding: 0.25rem 0.75rem;
-      border-radius: 20px;
-      font-family: 'SF Mono', monospace;
-    }
-
-    .badge-instances {
-      background: rgba(0, 217, 255, 0.1);
-      color: #00d9ff;
+    .template-runs {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-light);
+      padding: 0.2rem 0.5rem;
+      border-radius: 100px;
     }
 
     .template-description {
-      color: #a8b2d1;
-      margin-bottom: 1rem;
-      line-height: 1.6;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
     }
 
-    /* Parameters Section */
+    /* Parameters - New Design */
     .params-section {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 12px;
-      padding: 1rem;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
     }
 
-    .params-title {
-      font-size: 0.75rem;
+    .params-header {
+      font-size: 0.7rem;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #00ff88;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
       margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-light);
     }
 
-    .params-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    .params-list {
+      display: flex;
+      flex-direction: column;
       gap: 0.75rem;
     }
 
-    .param-item {
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 8px;
-      padding: 0.75rem;
+    .param-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
     }
 
     .param-name {
-      font-family: 'SF Mono', monospace;
-      font-size: 0.85rem;
-      color: #00d9ff;
-      margin-bottom: 0.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text);
     }
 
-    .param-type {
+    .param-name .type {
+      color: var(--text-muted);
+      font-weight: 400;
+      margin-left: 0.5rem;
       font-size: 0.7rem;
-      color: #6b7280;
-      text-transform: uppercase;
+    }
+
+    .param-name .required {
+      color: #dc2626;
+      margin-left: 0.125rem;
     }
 
     .param-desc {
       font-size: 0.8rem;
-      color: #8892b0;
-      margin-top: 0.25rem;
+      color: var(--text-secondary);
+      padding-left: 0;
+      line-height: 1.5;
     }
 
-    /* Steps Section */
+    /* Steps */
     .steps-section {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 12px;
-      padding: 1rem;
-      margin-bottom: 1rem;
+      margin-bottom: 1.25rem;
     }
 
-    .steps-title {
-      font-size: 0.75rem;
+    .steps-header {
+      font-size: 0.7rem;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #00ff88;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
       margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
     }
 
     .step {
       display: flex;
-      gap: 1rem;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      gap: 0.75rem;
+      padding: 0.625rem 0;
     }
 
-    .step:last-child {
-      border-bottom: none;
+    .step + .step {
+      border-top: 1px solid var(--border-light);
     }
 
-    .step-number {
-      width: 28px;
-      height: 28px;
-      background: linear-gradient(135deg, #00d9ff, #00ff88);
+    .step-num {
+      width: 1.375rem;
+      height: 1.375rem;
+      background: var(--text);
+      color: white;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.8rem;
+      font-size: 0.7rem;
       font-weight: 600;
-      color: #1a1a2e;
       flex-shrink: 0;
+      margin-top: 0.125rem;
     }
 
     .step-content {
       flex: 1;
+      min-width: 0;
     }
 
     .step-screen {
-      font-size: 0.75rem;
-      color: #6b7280;
-      margin-bottom: 0.25rem;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-muted);
+      margin-bottom: 0.125rem;
     }
 
     .step-action {
-      color: #e8e8e8;
+      font-size: 0.875rem;
+      color: var(--text);
     }
 
     .step-action .param-ref {
-      color: #00d9ff;
-      font-family: 'SF Mono', monospace;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+      background: var(--accent-light);
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
     }
 
-    /* Instances Section */
+    /* Instances */
     .instances-section {
+      border-top: 1px solid var(--border);
       margin-top: 1rem;
+      padding-top: 1rem;
     }
 
     .instances-toggle {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.375rem;
       cursor: pointer;
-      font-size: 0.9rem;
-      color: #8892b0;
-      padding: 0.5rem;
-      border-radius: 8px;
-      transition: all 0.2s;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      padding: 0.25rem 0;
     }
 
     .instances-toggle:hover {
-      background: rgba(255, 255, 255, 0.05);
-      color: #fff;
+      color: var(--text);
     }
 
     .instances-toggle .arrow {
+      font-size: 0.6rem;
       transition: transform 0.2s;
     }
 
@@ -285,7 +316,7 @@
 
     .instances-list {
       display: none;
-      margin-top: 0.75rem;
+      margin-top: 0.875rem;
     }
 
     .instances-list.open {
@@ -293,105 +324,100 @@
     }
 
     .instance-item {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: var(--bg);
       border-radius: 8px;
       padding: 1rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.625rem;
     }
 
-    .instance-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.75rem;
+    .instance-item:last-child {
+      margin-bottom: 0;
     }
 
     .instance-date {
-      font-size: 0.8rem;
-      color: #6b7280;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.625rem;
     }
 
-    .instance-values {
+    .instance-params {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .instance-param {
+      font-size: 0.8rem;
+      display: flex;
       gap: 0.5rem;
     }
 
-    .instance-value {
-      background: rgba(0, 217, 255, 0.1);
-      padding: 0.25rem 0.75rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .instance-param .key {
+      color: var(--text-muted);
+      font-weight: 500;
     }
 
-    .instance-value .key {
-      color: #8892b0;
+    .instance-param .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text);
     }
 
-    .instance-value .val {
-      color: #00d9ff;
-      font-family: 'SF Mono', monospace;
-    }
-
+    /* Screenshots */
     .instance-screenshots {
       display: flex;
-      gap: 0.5rem;
-      margin-top: 0.75rem;
+      gap: 0.375rem;
       overflow-x: auto;
-      padding-bottom: 0.5rem;
+      padding: 0.125rem 0;
     }
 
-    .instance-screenshot {
-      width: 120px;
-      height: 75px;
-      border-radius: 6px;
+    .screenshot-thumb {
+      width: 90px;
+      height: 56px;
+      border-radius: 4px;
       overflow: hidden;
       flex-shrink: 0;
       cursor: pointer;
-      border: 2px solid rgba(255, 255, 255, 0.1);
-      transition: all 0.2s;
+      border: 2px solid transparent;
+      transition: all 0.15s;
       position: relative;
+      background: var(--border);
     }
 
-    .instance-screenshot:hover {
-      border-color: #00d9ff;
+    .screenshot-thumb:hover {
+      border-color: var(--accent);
     }
 
-    .instance-screenshot.active {
-      border-color: #00ff88;
-      box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    .screenshot-thumb.active {
+      border-color: #059669;
     }
 
-    .instance-screenshot img {
+    .screenshot-thumb img {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
 
-    .instance-screenshot .step-badge {
+    .screenshot-thumb .num {
       position: absolute;
-      top: 4px;
-      left: 4px;
-      background: rgba(0, 0, 0, 0.7);
-      color: #fff;
-      font-size: 0.65rem;
-      padding: 2px 6px;
-      border-radius: 4px;
+      top: 3px;
+      left: 3px;
+      background: rgba(0,0,0,0.65);
+      color: white;
+      font-size: 0.55rem;
+      font-weight: 600;
+      padding: 1px 4px;
+      border-radius: 2px;
     }
 
     /* Modal */
     .modal {
       display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.95);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.92);
       z-index: 1000;
       justify-content: center;
       align-items: center;
@@ -402,137 +428,147 @@
       display: flex;
     }
 
-    .modal-content {
+    .modal-inner {
       max-width: 90%;
       max-height: 90%;
-      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
 
-    .modal-content img {
-      max-width: 100%;
-      max-height: 80vh;
-      border-radius: 12px;
-    }
-
     .modal-close {
-      position: absolute;
-      top: -2.5rem;
-      right: 0;
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
       background: none;
       border: none;
-      color: #fff;
-      font-size: 2rem;
+      color: white;
+      font-size: 1.25rem;
       cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.15s;
     }
 
-    .modal-info {
-      margin-top: 1rem;
+    .modal-close:hover {
+      opacity: 1;
+    }
+
+    .modal-image {
+      max-width: 100%;
+      max-height: 75vh;
+      border-radius: 6px;
+    }
+
+    .modal-caption {
+      margin-top: 0.875rem;
+      color: rgba(255,255,255,0.65);
+      font-size: 0.85rem;
       text-align: center;
-      color: #8892b0;
-    }
-
-    .modal-nav-hint {
-      margin-top: 0.5rem;
-      font-size: 0.8rem;
-      color: #6b7280;
     }
 
     .modal-nav {
       display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
+      align-items: center;
+      gap: 0.875rem;
+      margin-top: 0.875rem;
     }
 
     .modal-nav button {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #fff;
-      padding: 0.5rem 1.5rem;
-      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: white;
+      padding: 0.4rem 1rem;
+      border-radius: 5px;
       cursor: pointer;
-      font-size: 1rem;
-      transition: all 0.2s;
+      font-size: 0.8rem;
+      transition: background 0.15s;
     }
 
     .modal-nav button:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255,255,255,0.2);
     }
 
     .modal-nav button:disabled {
-      opacity: 0.3;
+      opacity: 0.25;
       cursor: not-allowed;
     }
 
     .modal-counter {
-      color: #00d9ff;
-      font-family: 'SF Mono', monospace;
-      font-size: 0.9rem;
-      padding: 0.5rem 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.45);
     }
 
-    /* Empty state */
+    .modal-hint {
+      margin-top: 0.625rem;
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
+    }
+
+    /* Empty State */
     .empty-state {
       text-align: center;
       padding: 4rem 2rem;
-      color: #6b7280;
     }
 
     .empty-state h2 {
-      font-size: 1.5rem;
+      font-size: 1.125rem;
+      font-weight: 600;
       margin-bottom: 0.5rem;
-      color: #8892b0;
+    }
+
+    .empty-state p {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
     }
 
     .loading {
       text-align: center;
       padding: 4rem;
-      color: #8892b0;
+      color: var(--text-muted);
+      font-size: 0.875rem;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <div class="header-left">
-        <h1>Workflow Recorder</h1>
-        <p class="subtitle">Workflow templates extracted from your browsing sessions</p>
-        <p class="stats" id="stats"></p>
+    <header class="header">
+      <div class="header-top">
+        <h1>Rewind</h1>
+        <div class="header-actions">
+          <button class="btn btn-primary" onclick="downloadJSON()" id="download-btn" style="display: none;">
+            Download JSON
+          </button>
+          <button class="btn btn-danger" onclick="resetDatabase()" id="reset-btn">
+            Clear All
+          </button>
+        </div>
       </div>
-      <div class="header-actions">
-        <button class="btn btn-primary" onclick="downloadJSON()" id="download-btn" style="display: none;">
-          📥 Download JSON
-        </button>
-        <button class="btn btn-danger" onclick="resetDatabase()" id="reset-btn">
-          Clear All Data
-        </button>
-      </div>
-    </div>
-    <div id="templates" class="template-grid">
+      <p class="subtitle">Workflow templates extracted from your browsing sessions</p>
+      <p class="stats" id="stats"></p>
+    </header>
+
+    <main id="templates" class="template-grid">
       <div class="loading">Loading templates...</div>
-    </div>
+    </main>
   </div>
 
   <div class="modal" id="modal">
-    <div class="modal-content">
-      <button class="modal-close" onclick="closeModal()">&times;</button>
-      <img id="modal-image" src="" alt="Screenshot">
-      <div class="modal-info" id="modal-info"></div>
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div class="modal-inner">
+      <img class="modal-image" id="modal-image" src="" alt="Screenshot">
+      <div class="modal-caption" id="modal-caption"></div>
       <div class="modal-nav">
-        <button onclick="prevScreenshot()" id="prev-btn">← Prev</button>
+        <button onclick="prevScreenshot()" id="prev-btn">Previous</button>
         <span class="modal-counter" id="modal-counter">1 / 1</span>
-        <button onclick="nextScreenshot()" id="next-btn">Next →</button>
+        <button onclick="nextScreenshot()" id="next-btn">Next</button>
       </div>
-      <div class="modal-nav-hint">Use ← → arrow keys to navigate</div>
+      <div class="modal-hint">Arrow keys to navigate</div>
     </div>
   </div>
 
   <script>
     let cachedTemplates = [];
-    
-    // Modal state for navigation
     let currentScreenshots = [];
     let currentScreenshotIndex = 0;
 
@@ -547,41 +583,42 @@
         cachedTemplates = templates;
 
         const totalInstances = templates.reduce((sum, t) => sum + (t.instances?.length || 0), 0);
-        statsEl.textContent = `${templates.length} template${templates.length !== 1 ? 's' : ''} • ${totalInstances} instance${totalInstances !== 1 ? 's' : ''}`;
+        statsEl.textContent = `${templates.length} template${templates.length !== 1 ? 's' : ''} · ${totalInstances} instance${totalInstances !== 1 ? 's' : ''}`;
         downloadBtn.style.display = templates.length > 0 ? 'inline-flex' : 'none';
 
         if (templates.length === 0) {
           container.innerHTML = `
             <div class="empty-state">
               <h2>No workflow templates yet</h2>
-              <p>Start recording by clicking the extension, then "Start Recording".<br>
-              Browse around, then click "Stop & Finalize" to extract workflow templates.</p>
+              <p>Start recording by clicking the Rewind extension, then "Start Recording".<br>
+              Perform your workflows, then click "Stop & Finalize" to extract templates.</p>
             </div>
           `;
           return;
         }
 
-        container.innerHTML = templates.map((template, tIdx) => {
-          const { id, name, description, inputs, outputs, steps, instances } = template;
+        container.innerHTML = templates.map((template) => {
+          const { name, description, inputs, outputs, steps, instances } = template;
           const instanceCount = instances?.length || 0;
 
           return `
-            <div class="template-card">
+            <article class="template-card">
               <div class="template-header">
-                <span class="template-name">${escapeHtml(name)}</span>
-                <span class="template-badge badge-instances">${instanceCount} run${instanceCount !== 1 ? 's' : ''}</span>
+                <h2 class="template-name">${esc(name)}</h2>
+                <span class="template-runs">${instanceCount} run${instanceCount !== 1 ? 's' : ''}</span>
               </div>
-              <p class="template-description">${escapeHtml(description)}</p>
+              <p class="template-description">${esc(description)}</p>
               
               ${Object.keys(inputs).length > 0 ? `
                 <div class="params-section">
-                  <div class="params-title">Inputs</div>
-                  <div class="params-grid">
+                  <div class="params-header">Inputs</div>
+                  <div class="params-list">
                     ${Object.entries(inputs).map(([key, param]) => `
-                      <div class="param-item">
-                        <div class="param-name">{${key}}</div>
-                        <div class="param-type">${param.type}${param.required ? '' : ' (optional)'}</div>
-                        <div class="param-desc">${escapeHtml(param.description)}</div>
+                      <div class="param-row">
+                        <div class="param-name">
+                          ${key}<span class="type">${param.type}</span>${param.required ? '<span class="required">*</span>' : ''}
+                        </div>
+                        <div class="param-desc">${esc(param.description || '')}</div>
                       </div>
                     `).join('')}
                   </div>
@@ -590,13 +627,14 @@
 
               ${Object.keys(outputs).length > 0 ? `
                 <div class="params-section">
-                  <div class="params-title">📤 Outputs</div>
-                  <div class="params-grid">
+                  <div class="params-header">Outputs</div>
+                  <div class="params-list">
                     ${Object.entries(outputs).map(([key, param]) => `
-                      <div class="param-item">
-                        <div class="param-name">{${key}}</div>
-                        <div class="param-type">${param.type}</div>
-                        <div class="param-desc">${escapeHtml(param.description)}</div>
+                      <div class="param-row">
+                        <div class="param-name">
+                          ${key}<span class="type">${param.type}</span>
+                        </div>
+                        <div class="param-desc">${esc(param.description || '')}</div>
                       </div>
                     `).join('')}
                   </div>
@@ -604,16 +642,18 @@
               ` : ''}
 
               <div class="steps-section">
-                <div class="steps-title">Steps</div>
-                ${steps.map((step, i) => `
-                  <div class="step">
-                    <span class="step-number">${step.stepNumber || i + 1}</span>
-                    <div class="step-content">
-                      <div class="step-screen">${escapeHtml(step.screenPattern)}</div>
-                      <div class="step-action">${highlightParams(escapeHtml(step.actionTemplate))}</div>
+                <div class="steps-header">Steps</div>
+                <div class="steps-list">
+                  ${steps.map((step, i) => `
+                    <div class="step">
+                      <span class="step-num">${step.stepNumber || i + 1}</span>
+                      <div class="step-content">
+                        <div class="step-screen">${esc(step.screenPattern)}</div>
+                        <div class="step-action">${highlightParams(esc(step.actionTemplate))}</div>
+                      </div>
                     </div>
-                  </div>
-                `).join('')}
+                  `).join('')}
+                </div>
               </div>
 
               ${instanceCount > 0 ? `
@@ -623,28 +663,26 @@
                     <span>View ${instanceCount} instance${instanceCount !== 1 ? 's' : ''}</span>
                   </div>
                   <div class="instances-list">
-                    ${instances.map((inst, iIdx) => {
+                    ${instances.map((inst) => {
                       const date = new Date(inst.createdAt).toLocaleDateString('en-US', {
                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                       });
                       const screenshotsJson = JSON.stringify(inst.stepSnapshots || []).replace(/'/g, "\\'");
                       return `
                         <div class="instance-item">
-                          <div class="instance-header">
-                            <span class="instance-date">📅 ${date}</span>
-                          </div>
-                          <div class="instance-values">
+                          <div class="instance-date">${date}</div>
+                          <div class="instance-params">
                             ${Object.entries(inst.parameterValues || {}).map(([k, v]) => `
-                              <span class="instance-value">
+                              <div class="instance-param">
                                 <span class="key">${k}:</span>
-                                <span class="val">${escapeHtml(truncate(String(v), 50))}</span>
-                              </span>
+                                <span class="val">${esc(truncate(String(v), 60))}</span>
+                              </div>
                             `).join('')}
                             ${Object.entries(inst.extractedValues || {}).filter(([k,v]) => v != null).map(([k, v]) => `
-                              <span class="instance-value">
+                              <div class="instance-param">
                                 <span class="key">${k}:</span>
-                                <span class="val">${escapeHtml(truncate(String(v), 50))}</span>
-                              </span>
+                                <span class="val">${esc(truncate(String(v), 60))}</span>
+                              </div>
                             `).join('')}
                           </div>
                           ${inst.stepSnapshots?.length > 0 ? `
@@ -652,8 +690,8 @@
                               ${inst.stepSnapshots.map((snap, sIdx) => {
                                 const url = '/screenshots/' + snap.screenshotPath.split('/').pop();
                                 return `
-                                  <div class="instance-screenshot" onclick="openModalWithNav(this, ${sIdx})" data-url="${url}" data-action="${escapeHtml(snap.action)}">
-                                    <span class="step-badge">${snap.stepNumber}</span>
+                                  <div class="screenshot-thumb" onclick="openModalWithNav(this, ${sIdx})" data-url="${url}" data-action="${esc(snap.action)}">
+                                    <span class="num">${snap.stepNumber}</span>
                                     <img src="${url}" alt="Step ${snap.stepNumber}" loading="lazy">
                                   </div>
                                 `;
@@ -666,7 +704,7 @@
                   </div>
                 </div>
               ` : ''}
-            </div>
+            </article>
           `;
         }).join('');
       } catch (error) {
@@ -679,16 +717,16 @@
       }
     }
 
-    function escapeHtml(text) {
+    function esc(text) {
       if (!text) return '';
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
     }
 
-    function truncate(text, maxLen) {
+    function truncate(text, max) {
       if (!text) return '';
-      return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
+      return text.length > max ? text.slice(0, max) + '…' : text;
     }
 
     function highlightParams(text) {
@@ -700,12 +738,10 @@
       el.nextElementSibling.classList.toggle('open');
     }
 
-    // New modal functions with navigation
     function openModalWithNav(el, index) {
       const container = el.closest('.instance-screenshots');
-      const screenshots = container.querySelectorAll('.instance-screenshot');
+      const screenshots = container.querySelectorAll('.screenshot-thumb');
       
-      // Build array of screenshot data
       currentScreenshots = Array.from(screenshots).map(s => ({
         url: s.dataset.url,
         action: s.dataset.action,
@@ -718,19 +754,17 @@
     }
 
     function updateModal() {
-      const screenshot = currentScreenshots[currentScreenshotIndex];
-      if (!screenshot) return;
+      const shot = currentScreenshots[currentScreenshotIndex];
+      if (!shot) return;
       
-      document.getElementById('modal-image').src = screenshot.url;
-      document.getElementById('modal-info').textContent = screenshot.action;
+      document.getElementById('modal-image').src = shot.url;
+      document.getElementById('modal-caption').textContent = shot.action;
       document.getElementById('modal-counter').textContent = 
         `${currentScreenshotIndex + 1} / ${currentScreenshots.length}`;
       
-      // Update nav buttons
       document.getElementById('prev-btn').disabled = currentScreenshotIndex === 0;
       document.getElementById('next-btn').disabled = currentScreenshotIndex === currentScreenshots.length - 1;
       
-      // Update active state on thumbnails
       currentScreenshots.forEach((s, i) => {
         s.element.classList.toggle('active', i === currentScreenshotIndex);
       });
@@ -752,29 +786,17 @@
 
     function closeModal() {
       document.getElementById('modal').classList.remove('active');
-      // Clear active states
       currentScreenshots.forEach(s => s.element.classList.remove('active'));
       currentScreenshots = [];
     }
 
-    // Keyboard navigation
     document.addEventListener('keydown', (e) => {
       const modal = document.getElementById('modal');
       if (!modal.classList.contains('active')) return;
       
-      switch(e.key) {
-        case 'Escape':
-          closeModal();
-          break;
-        case 'ArrowLeft':
-          prevScreenshot();
-          e.preventDefault();
-          break;
-        case 'ArrowRight':
-          nextScreenshot();
-          e.preventDefault();
-          break;
-      }
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'ArrowLeft') { prevScreenshot(); e.preventDefault(); }
+      if (e.key === 'ArrowRight') { nextScreenshot(); e.preventDefault(); }
     });
 
     document.getElementById('modal').addEventListener('click', (e) => {
@@ -782,16 +804,12 @@
     });
 
     function downloadJSON() {
-      if (cachedTemplates.length === 0) {
-        alert('No templates to download');
-        return;
-      }
-
+      if (cachedTemplates.length === 0) return alert('No templates to download');
       const blob = new Blob([JSON.stringify(cachedTemplates, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `workflow-templates-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `rewind-templates-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -799,22 +817,19 @@
     }
 
     async function resetDatabase() {
-      if (!confirm('⚠️ This will permanently delete ALL templates and instances.\n\nAre you sure?')) return;
-
+      if (!confirm('This will permanently delete all templates and instances. Continue?')) return;
       const btn = document.getElementById('reset-btn');
       btn.disabled = true;
       btn.textContent = 'Clearing...';
-
       try {
-        const response = await fetch('/reset', { method: 'POST' });
-        if (!response.ok) throw new Error('Failed to reset');
-        alert('✅ Database cleared!');
+        const res = await fetch('/reset', { method: 'POST' });
+        if (!res.ok) throw new Error('Failed to reset');
         loadTemplates();
-      } catch (error) {
-        alert('❌ Error: ' + error.message);
+      } catch (err) {
+        alert('Error: ' + err.message);
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Clear All Data';
+        btn.textContent = 'Clear All';
       }
     }
 
