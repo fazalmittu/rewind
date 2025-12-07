@@ -88,7 +88,7 @@ cp .env.example .env
 
 ```bash
 OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-4.1              # optional
+OPENAI_MODEL=gpt-5.1              # optional
 API_URL=http://localhost:3000     # optional
 ```
 
