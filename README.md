@@ -162,7 +162,24 @@ npm run dev     # Runs on localhost:3001
 
 ## Limitations
 
-- Vision-only, doesn't deeply parse DOM
-- Single user at a time
-- Captures workflows but doesn't replay them
-- AI extraction quality varies
+There's a lot:
+
+- **Vision-only** — Relies on screenshots, doesn't deeply parse DOM structure
+- **No replay** — Captures workflows but can't execute them
+- **Chrome only** — No Firefox/Safari support
+- **Single user** — No multi-user or collaborative recording
+- **AI quality varies** — Template extraction depends heavily on model quality and prompt engineering
+- **Screenshot timing** — Might miss intermediate states if UI changes faster than capture rate
+- **Rich text editors** — Contenteditable elements (Notion, Linear, etc.) are finicky to capture
+- **No drag-and-drop** — Doesn't capture drag operations
+- **No file uploads** — Can't capture file picker interactions
+- **No hover states** — Hover-triggered menus/tooltips might not capture well
+- **Multi-tab workflows** — Gets messy when workflows span multiple tabs
+- **Popups/modals** — External popups might not capture correctly
+- **Storage grows fast** — Screenshots add up quick, no compression or cleanup
+- **No incremental processing** — Have to finalize whole session, can't process as you go
+- **Debounce timing** — Rapid inputs might get missed or merged
+- **No manual correction** — Can't edit or annotate captured data after the fact
+- **Templates are static** — Once created, templates don't evolve with new instances
+- **Session continuity** — Auth flows, redirects, or page refreshes can break things
+- **Backend must be running** — Extension doesn't work standalone
