@@ -19,7 +19,7 @@
 
 Rewind watches you work and learns your workflows. It captures screenshots and interactions, then uses AI to:
 
-- **Identify workflow patterns** - Detects when you're creating tickets, changing statuses, adding comments, etc.
+- **Identify workflow patterns** - Segments video into repeatable workflows with clear inputs + steps
 - **Extract parameters** - Learns which parts vary (search queries, names, values) vs. which are fixed
 - **Generate reusable templates** - Creates step-by-step workflows that can be replayed with different inputs
 
