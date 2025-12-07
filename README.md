@@ -5,7 +5,7 @@
 <h1 align="center">Rewind</h1>
 
 <p align="center">
-  A vision-based workflow recorder that captures how people actually work in browsers.
+  A vision-based workflow recorder for browser apps.
 </p>
 
 <p align="center">
@@ -16,140 +16,99 @@
 
 ---
 
-## Why This Exists
+## Why I Built This
 
-Browser automation is having a moment. Companies are racing to build agents that can navigate web apps, fill out forms, and complete tasks the way humans do. But there's a problem: **you can't automate what you don't understand**.
+Automating browser tasks is something a lot of companies are working on right now. Most of people's work lives inside a browser, and there's a whole industry trying to train models to execute these tasks in a human-like way.
 
-I've spent countless hours shadowing people at work—watching them click through dashboards, fill out forms, navigate between apps. Then I'd go back and watch recordings, try to remember what they did, figure out which steps were essential vs. incidental, and test whether my automation actually matched their workflow.
+From my own experience, I've had to sit down and shadow people's work for hours before building software that could handle it. The process of recollecting info from these multi-hour sessions, having to go back and watch recordings, and testing against expectations was super tedious.
 
-It was tedious. The gap between "watching someone work" and "having structured data about their workflow" was huge.
+I built this to make the data collection part easier. Frankly I didn't put much thought into what should be done with the data afterward—it could be used as training data for agents, tracking work done across an organization, whatever. The point is just to capture structured workflow data from real browser usage.
 
-**Rewind closes that gap.**
+---
 
-Instead of taking notes while you shadow someone, just turn on Rewind. It captures screenshots, tracks interactions, and uses AI to make sense of what happened. At the end, you get:
+## What It Does
 
-- **Canonical screens** — The distinct UI states the user encountered
-- **Workflow templates** — Reusable patterns with identified inputs/outputs
-- **Concrete instances** — Specific examples of each workflow being executed
+You turn on the recorder, do your work, and when you're done it gives you:
 
-## What You Can Do With This Data
-
-Honestly? I built this to make data collection easier. What you do with it is up to you:
-
-- **Train browser agents** — Use the captured workflows as training data for models that automate tasks
-- **Document processes** — Generate step-by-step guides from real user behavior
-- **Track work patterns** — Understand how people actually use your tools (vs. how you designed them)
-- **Build RPA pipelines** — Extract the exact sequences needed to automate repetitive work
-- **Onboard new employees** — Show them exactly how experienced users complete tasks
+- **Canonical screens** — The distinct pages/states you visited
+- **Workflow templates** — Patterns it identified, with inputs and steps
+- **Workflow instances** — Specific examples of each pattern being executed
 
 ---
 
 ## How It Works
 
-### The Recording Flow
+### Recording
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Chrome Ext.    │───▶│  Backend API    │───▶│  SQLite DB      │
-│  captures       │    │  stores events  │    │  persists       │
-│  clicks/inputs  │    │  + screenshots  │    │  workflows      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+1. Chrome extension captures clicks, inputs, form submissions
+2. Each event includes a screenshot
+3. Events stream to the backend and accumulate in memory
+4. When you stop, the backend processes everything
 
-1. **You start recording** via the browser extension
-2. **Extension captures** every click, input, and form submission along with a screenshot
-3. **Events stream** to the backend and accumulate in memory for the session
-4. **You stop recording** and trigger finalization
+### Processing Pipeline
 
-### The Processing Pipeline
+When you finalize a session, it runs 3 stages:
 
-When you finalize a session, the backend runs a 3-stage AI pipeline:
+**1. Screen Canonicalization**
 
-#### Stage 1: Screen Canonicalization
+Groups similar URLs into screen types. So `https://app.com/patients/123` and `https://app.com/patients/456` both become "Patient Detail Page".
 
-Raw screenshots get grouped into **canonical screen types**. The AI looks at URLs and visual similarity to determine things like:
+**2. Instance Segmentation**
 
-- `https://app.com/patients/123` and `https://app.com/patients/456` → both are "Patient Detail Page"
-- `https://app.com/dashboard` → "Dashboard"
-- `https://app.com/search?q=aspirin` → "Search Results Page"
+Chunks the event sequence into distinct tasks. A 20-minute session in an EHR might have 3 "patient creation" instances and 1 "update patient record" instance.
 
-This creates a vocabulary of screens that the workflow can reference.
+**3. Template Synthesis**
 
-#### Stage 2: Instance Segmentation
-
-The sequence of events gets chunked into **distinct workflow instances**. The AI identifies:
-
-- Where one task ends and another begins
-- What the user was trying to accomplish in each chunk
-- Which screens and actions belong together
-
-Example: A 20-minute session might contain 3 instances of "Search and add item to cart" and 1 instance of "Update patient record".
-
-#### Stage 3: Template Synthesis
-
-Similar instances get merged into **reusable templates**. The AI extracts:
-
-- **Inputs** — Parameters you'd provide to run this workflow (e.g., `search_query`, `patient_name`)
-- **Steps** — The sequence of actions, with variable parts marked as `{parameters}`
-- **Outputs** — Data extracted during execution (e.g., `order_id`, `confirmation_number`)
+Merges similar instances into reusable templates with:
+- Inputs (what you'd provide to run this workflow)
+- Steps (the action sequence)
+- Outputs (data extracted during execution)
 
 ### Data Model
 
 ```
-┌────────────────────┐
-│ Canonical Screens  │  Distinct UI states (e.g., "Login Page", "Product Detail")
-└────────────────────┘
-         │
-         ▼
-┌────────────────────┐
-│ Workflow Templates │  Reusable patterns with inputs/outputs/steps
-└────────────────────┘
-         │
-         ▼
-┌────────────────────┐
-│ Workflow Instances │  Concrete executions with actual parameter values
-└────────────────────┘
+Canonical Screens  →  Workflow Templates  →  Workflow Instances
+(UI states)           (reusable patterns)    (concrete executions)
 ```
 
 ---
 
-## Quick Start
+## Setup
 
-### 1. Install Dependencies
+### 1. Install
 ```bash
 npm install
 ```
 
-### 2. Configure Environment
+### 2. Configure
 ```bash
 cp .env.example .env
-# Edit .env and add your OpenAI API key
+# Add your OpenAI API key
 ```
 
 ```bash
-OPENAI_API_KEY=sk-your-key-here    # Required
-OPENAI_MODEL=gpt-5.1               # Optional (default: gpt-5.1)
-API_URL=http://localhost:3000      # Optional
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4.1              # optional
+API_URL=http://localhost:3000     # optional
 ```
 
-### 3. Build & Start
+### 3. Run
 ```bash
-npm run build:extension  # Compile the Chrome extension
-npm run dev              # Start backend with hot reload
+npm run build:extension
+npm run dev
 ```
 
 ### 4. Load Extension
-1. Open Chrome → `chrome://extensions/`
+1. Chrome → `chrome://extensions/`
 2. Enable "Developer mode"
-3. Click "Load unpacked"
-4. Select the `extension/` folder
+3. "Load unpacked" → select `extension/` folder
 
-### 5. Record
-1. Click the Rewind icon in Chrome
-2. Click **Start Recording**
-3. Do your work in any web app
-4. Click **Stop & Finalize**
-5. View results at `http://localhost:3000`
+### 5. Use It
+1. Click Rewind icon
+2. Start Recording
+3. Do stuff in a web app
+4. Stop & Finalize
+5. Check `http://localhost:3000`
 
 ---
 
@@ -157,49 +116,53 @@ npm run dev              # Start backend with hot reload
 
 ```
 rewind/
-├── backend/                 # Express server
-│   ├── pipeline/            # AI processing stages
-│   │   ├── screenCanonicalizer.ts
-│   │   ├── instanceSegmenter.ts
-│   │   └── templateSynthesizer.ts
-│   ├── db.ts                # SQLite operations
-│   ├── llm.ts               # OpenAI API wrapper
-│   ├── sessionStore.ts      # In-memory session state
-│   ├── server.ts            # Express routes
-│   └── types.ts             # TypeScript interfaces
-├── extension/               # Chrome extension
+├── backend/
+│   ├── pipeline/           # The 3 processing stages
+│   ├── db.ts               # SQLite stuff
+│   ├── llm.ts              # OpenAI calls
+│   ├── sessionStore.ts     # In-memory session state
+│   └── server.ts           # Express routes
+├── extension/
 │   ├── src/
-│   │   ├── background.ts    # Service worker
-│   │   ├── contentScript.ts # Injected into pages
-│   │   └── popup.ts         # Extension popup UI
-│   ├── manifest.json
-│   └── dist/                # Compiled JS
-├── frontend/                # Workflow viewer
-│   └── index.html           # Single-page dashboard
-├── simulations/             # Test environments
-│   └── ehr/                 # Sample EHR app for testing
-└── storage/
-    └── screenshots/         # Captured images
+│   │   ├── background.ts   # Service worker
+│   │   ├── contentScript.ts
+│   │   └── popup.ts
+│   └── dist/               # Built JS
+├── frontend/
+│   └── index.html          # Viewer dashboard
+├── simulations/            # Test apps
+└── storage/screenshots/
 ```
 
-## Development
+## Scripts
 
 ```bash
-npm run dev              # Start backend (hot reload)
-npm run build:extension  # Build extension once
-npm run watch:extension  # Rebuild extension on changes
-npm test                 # Run test suite
+npm run dev              # Backend with hot reload
+npm run build:extension  # Build extension
+npm run watch:extension  # Watch mode
+npm test                 # Tests
 ```
 
 ---
 
-## Limitations & Future Work
+## Testing It Out
 
-- **Vision-only** — Currently relies on screenshots + basic DOM info. Doesn't deeply parse page structure.
-- **Single session** — Records one user at a time. No multi-user or collaborative features yet.
-- **No replay** — Captures workflows but doesn't execute them. That's a separate (harder) problem.
-- **AI quality varies** — Template extraction is only as good as the underlying model's understanding.
+To test this, I spun up a dummy EHR environment. Cool thing about software these days is it allows for very quick testing. I spent some time looking for demo environments to test with and then realized I could just make my own. It took a single prompt to create a fully interactive EHR with a database, patient records, the whole thing.
+
+It lives in `simulations`. There's a README in there with instructions for how anyone can create a new demo environment to test with. You can use it to try out the recorder in different settings. 
+
+```bash
+cd simulations/ehr
+npm install
+npm run seed    # Populate with fake data
+npm run dev     # Runs on localhost:3001
+```
 
 ---
 
-Built because I got tired of watching recordings at 2x speed and taking notes.
+## Limitations
+
+- Vision-only, doesn't deeply parse DOM
+- Single user at a time
+- Captures workflows but doesn't replay them
+- AI extraction quality varies
