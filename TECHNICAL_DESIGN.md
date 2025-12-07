@@ -1,527 +1,396 @@
-# Workflow Recorder - Technical Design Document
+# Rewind - Technical Design Document
 
-> **Version**: 1.0  
-> **Last Updated**: 2025-12-05  
-> **Status**: Implementation In Progress
-
----
-
-## 1. Project Summary
-
-A vision-only workflow recorder for browser-based applications. Records user interactions (clicks), captures screenshots after UI stabilization, summarizes actions/screens via GPT-4o, stores events in SQLite, and automatically segments + refines workflows.
-
-### Core Components
-
-1. **Chrome Extension** - Detects clicks, waits for stabilization, captures screenshots, sends to backend
-2. **Backend Server** - Ingests events, calls LLM for summaries, stores in SQLite, segments workflows
-3. **Workflow Segmenter** - Identifies distinct workflows from screen transitions
-4. **Workflow Refiner** - GPT post-processing to name, describe, and deduplicate workflows
-5. **Frontend** - Simple viewer for workflows
+> **Version**: 2.0  
+> **Last Updated**: 2025-12-07  
+> **Status**: Implemented
 
 ---
 
-## 2. Architecture Decisions
+## 1. Overview
 
-| Decision | Resolution |
-|----------|------------|
-| Session ID ownership | Background script owns sessionId, stored in `chrome.storage.local` |
-| Session finalization | Extension popup with "Stop & Finalize" button |
-| Workflow storage | 3 tables: `raw_workflows`, `refined_workflows`, `refined_workflow_map` (handles GPT merging) |
-| LLM functions | Split into `callLLMText` and `callLLMWithImage` |
-| GPT JSON parsing | `sanitizeJSON()` helper strips markdown fences + retry logic |
-| Frontend serving | Static files at `/` via `express.static("frontend")` |
-| Database location | `backend/data.db` |
-| Zero workflows | Skip GPT call, return empty arrays |
-| Extension build | TypeScript → JS via esbuild to `extension/dist/` |
-| Multi-tab behavior | Single session across all tabs until finalized |
-| LLM Provider | GPT-4o via OpenAI API |
+Rewind is a vision-based workflow recorder that captures browser interactions and uses AI to extract reusable workflow templates with parameters.
 
----
-
-## 3. File Structure
+### Core Concept
 
 ```
-workflow-recorder/
-│
-├── extension/
-│   ├── src/
-│   │   ├── contentScript.ts
-│   │   ├── background.ts
-│   │   ├── stabilization.ts
-│   │   └── popup.ts
-│   ├── dist/                    # Compiled JS (gitignored)
-│   ├── popup.html
-│   └── manifest.json
-│
+User clicks around in a web app
+        ↓
+Extension captures events + screenshots
+        ↓
+AI analyzes and groups similar screens
+        ↓
+AI segments into distinct workflow instances
+        ↓
+AI synthesizes reusable templates with {parameters}
+        ↓
+Templates + instances stored for viewing/export
+```
+
+### Key Innovation
+
+Instead of just recording steps, Rewind identifies:
+- **What varies** (parameters like `search_query`, `patient_name`)
+- **What's fixed** (the workflow structure)
+- **Canonical screens** (grouping "iPad Detail Page" and "iPhone Detail Page" as "Product Detail Page")
+
+---
+
+## 2. Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Chrome Extension                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ Content     │  │ Background  │  │ Popup                   │  │
+│  │ Script      │→ │ Script      │→ │ Start/Stop Recording    │  │
+│  │ (events)    │  │ (capture)   │  │ Finalize Session        │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ POST /ingest
+                             ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                        Backend Server                            │
+│  ┌─────────────┐  ┌──────────────────────────────────────────┐  │
+│  │ Session     │  │ Finalization Pipeline                    │  │
+│  │ Store       │  │  1. Screen Canonicalization (GPT)        │  │
+│  │ (in-memory) │  │  2. Instance Segmentation (GPT)          │  │
+│  │             │→ │  3. Template Synthesis (GPT)             │  │
+│  └─────────────┘  └──────────────────────────────────────────┘  │
+│                                      │                           │
+│                                      ↓                           │
+│                        ┌─────────────────────────┐               │
+│                        │ SQLite Database         │               │
+│                        │ - canonical_screens     │               │
+│                        │ - workflow_templates    │               │
+│                        │ - workflow_instances    │               │
+│                        └─────────────────────────┘               │
+└─────────────────────────────────────────────────────────────────┘
+                             │
+                             ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                        Frontend Dashboard                        │
+│  - View templates with inputs/outputs                           │
+│  - Expand to see instances with actual values                   │
+│  - Navigate screenshots with arrow keys                         │
+│  - Export as JSON                                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Event Capture
+
+### Event Types
+
+| Type | Trigger | Captured Data |
+|------|---------|---------------|
+| `click` | User clicks any element | x, y, targetTag, targetText |
+| `input` | User types in text field (debounced 800ms) | inputValue, inputName, inputLabel |
+| `change` | Dropdown/checkbox selection | inputValue, inputName, inputType |
+| `submit` | Form submission | form fields list |
+
+### Contenteditable Support
+
+Modern apps (Linear, Notion) use `contenteditable` divs instead of `<input>`. We detect:
+- `[contenteditable="true"]`
+- `.ProseMirror`, `.ql-editor`, `.DraftEditor-root`, `.tiptap`
+- `[data-slate-editor]`, `[role="textbox"]`
+
+### Screenshot Capture
+
+After each event:
+1. Wait for UI stabilization (400ms for clicks, 100ms for inputs)
+2. Capture visible tab via `chrome.tabs.captureVisibleTab`
+3. Send base64 PNG to backend
+
+---
+
+## 4. In-Memory Session Store
+
+During recording, events are stored in memory (not DB):
+
+```typescript
+interface SessionState {
+  sessionId: string;
+  events: CapturedEvent[];
+  createdAt: number;
+}
+```
+
+This allows fast event accumulation without DB overhead. Data is only persisted upon finalization.
+
+---
+
+## 5. Finalization Pipeline
+
+When user clicks "Stop & Finalize":
+
+### Stage 1: Screen Canonicalization
+
+**Goal:** Group similar screens into canonical types.
+
+```
+Input:  URLs like /dp/B09V3KXJPB, /dp/B08N5WRWNW
+Output: Canonical screen "Product Detail Page" with pattern /dp/*
+```
+
+**Process:**
+1. Extract URL patterns (replace dynamic segments with `*`)
+2. Group events by pattern
+3. Send to GPT to assign canonical labels
+4. Map each event to its canonical screenId
+
+### Stage 2: Instance Segmentation
+
+**Goal:** Identify distinct workflow attempts.
+
+```
+Input:  Sequence of 15 events
+Output: 2 instances: "Search for iPad" (events 0-7), "Search for tree" (events 8-14)
+```
+
+**Process:**
+1. Send event sequence with screen labels to GPT
+2. GPT identifies goal-based groupings
+3. Returns start/end indices for each instance
+
+### Stage 3: Template Synthesis
+
+**Goal:** Create reusable template with parameters from each instance.
+
+```
+Input:  Instance events with typed text "iPad", "3", clicked "Add to Cart"
+Output: Template "Search and Add to Cart" with inputs {search_query, quantity}
+```
+
+**Process:**
+1. Send instance events to GPT
+2. GPT identifies:
+   - Input parameters (values that would vary)
+   - Output parameters (extracted values)
+   - Step templates with `{placeholders}`
+3. Returns template + instance values
+
+---
+
+## 6. Database Schema
+
+### `canonical_screens`
+```sql
+CREATE TABLE canonical_screens (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,              -- "Product Detail Page"
+  description TEXT NOT NULL,
+  urlPatternsJson TEXT NOT NULL,    -- ["/dp/*", "/product/*"]
+  exampleScreenshotPath TEXT NOT NULL,
+  createdAt INTEGER NOT NULL
+);
+```
+
+### `workflow_templates`
+```sql
+CREATE TABLE workflow_templates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,               -- "Search and Add to Cart"
+  description TEXT NOT NULL,
+  inputsJson TEXT NOT NULL,         -- {search_query: {type, desc, required}}
+  outputsJson TEXT NOT NULL,        -- {product_name: {type, desc}}
+  stepsJson TEXT NOT NULL,          -- [{stepNumber, screenPattern, actionTemplate, usesInputs, extracts}]
+  createdAt INTEGER NOT NULL,
+  updatedAt INTEGER NOT NULL
+);
+```
+
+### `workflow_instances`
+```sql
+CREATE TABLE workflow_instances (
+  id TEXT PRIMARY KEY,
+  templateId TEXT NOT NULL,
+  sessionId TEXT NOT NULL,
+  parameterValuesJson TEXT NOT NULL,   -- {search_query: "iPad", quantity: 3}
+  extractedValuesJson TEXT NOT NULL,   -- {product_name: "iPad Pro"}
+  stepSnapshotsJson TEXT NOT NULL,     -- [{stepNumber, screenshotPath, action, screenLabel}]
+  createdAt INTEGER NOT NULL,
+  FOREIGN KEY (templateId) REFERENCES workflow_templates(id)
+);
+```
+
+---
+
+## 7. Type Definitions
+
+```typescript
+// Captured from browser
+interface CapturedEvent {
+  timestamp: number;
+  eventType: "click" | "input" | "change" | "submit";
+  url: string;
+  screenshotPath: string;
+  targetTag: string;
+  targetText?: string;
+  clickX?: number;
+  clickY?: number;
+  inputValue?: string;
+  inputName?: string;
+  inputLabel?: string;
+  inputType?: string;
+  screenId?: string;        // Added during canonicalization
+}
+
+// Canonical screen type
+interface CanonicalScreen {
+  id: string;
+  label: string;            // Generic: "Product Detail Page"
+  description: string;
+  urlPatterns: string[];
+  exampleScreenshotPath: string;
+}
+
+// Reusable workflow template
+interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string;
+  inputs: Record<string, ParameterDef>;
+  outputs: Record<string, ParameterDef>;
+  steps: TemplateStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface ParameterDef {
+  type: "string" | "number" | "boolean";
+  description: string;
+  required: boolean;
+  default?: any;
+  observedValues: any[];
+}
+
+interface TemplateStep {
+  stepNumber: number;
+  screenPattern: string;        // Canonical screen label
+  actionTemplate: string;       // "Enter {search_query} in search"
+  usesInputs: string[];
+  extracts: Record<string, ExtractionDef>;
+}
+
+// Specific execution of a template
+interface WorkflowInstance {
+  id: string;
+  templateId: string;
+  sessionId: string;
+  parameterValues: Record<string, any>;
+  extractedValues: Record<string, any>;
+  stepSnapshots: StepSnapshot[];
+  createdAt: number;
+}
+```
+
+---
+
+## 8. API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/ingest` | Receive event + screenshot from extension |
+| POST | `/finalize-session` | Run pipeline, persist to DB |
+| GET | `/templates` | List all templates with their instances |
+| GET | `/screens` | List all canonical screens |
+| POST | `/reset` | Clear all data |
+| GET | `/health` | Health check |
+
+---
+
+## 9. File Structure
+
+```
+rewind/
 ├── backend/
+│   ├── pipeline/
+│   │   ├── index.ts                 # Pipeline orchestrator
+│   │   ├── screenCanonicalizer.ts   # Stage 1
+│   │   ├── instanceSegmenter.ts     # Stage 2
+│   │   └── templateSynthesizer.ts   # Stage 3
+│   ├── __tests__/
+│   │   ├── db.test.ts
+│   │   ├── server.test.ts
+│   │   └── pipeline.test.ts
 │   ├── server.ts
 │   ├── db.ts
 │   ├── llm.ts
-│   ├── workflowSegmenter.ts
-│   ├── workflowRefiner.ts
+│   ├── sessionStore.ts
 │   ├── types.ts
-│   ├── db.test.ts
-│   ├── workflowSegmenter.test.ts
-│   ├── llm.test.ts
-│   ├── server.test.ts
-│   └── data.db                  # SQLite database (gitignored)
+│   └── index.ts
+│
+├── extension/
+│   ├── src/
+│   │   ├── contentScript.ts         # Event capture
+│   │   ├── background.ts            # Screenshot + API calls
+│   │   ├── stabilization.ts
+│   │   └── popup.ts
+│   ├── dist/                        # Compiled JS
+│   ├── icons/
+│   ├── popup.html
+│   └── manifest.json
 │
 ├── frontend/
-│   └── index.html
+│   └── index.html                   # Dashboard
 │
 ├── storage/
-│   └── screenshots/             # Screenshot PNGs (gitignored)
+│   └── screenshots/                 # Captured PNGs
 │
-├── .env                         # API keys (gitignored)
-├── .env.example
-├── .gitignore
-├── package.json
-├── tsconfig.json
-├── jest.config.js
-├── esbuild.config.js
-├── TECHNICAL_DESIGN.md
-└── README.md
+├── simulations/                     # Test environments
+│   ├── README.md
+│   └── ehr/                         # EHR simulation app
+│
+└── .env                             # OPENAI_API_KEY, etc.
 ```
 
 ---
 
-## 4. Database Schema
-
-### Table: `events`
-Stores each recorded user interaction.
-
-```sql
-CREATE TABLE events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  sessionId TEXT NOT NULL,
-  timestamp INTEGER NOT NULL,
-  url TEXT NOT NULL,
-  eventType TEXT NOT NULL,
-  screenshotPath TEXT NOT NULL,
-  actionSummary TEXT NOT NULL,
-  screenSummary TEXT NOT NULL
-);
-```
-
-### Table: `raw_workflows`
-Stores workflows as segmented (before GPT refinement).
-
-```sql
-CREATE TABLE raw_workflows (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  sessionId TEXT NOT NULL,
-  workflowJson TEXT NOT NULL,
-  createdAt INTEGER NOT NULL
-);
-```
-
-### Table: `refined_workflows`
-Stores GPT-refined workflows with names and descriptions.
-
-```sql
-CREATE TABLE refined_workflows (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  sessionId TEXT NOT NULL,
-  refinedJson TEXT NOT NULL,
-  createdAt INTEGER NOT NULL
-);
-```
-
-### Table: `refined_workflow_map`
-Many-to-many mapping between raw and refined workflows (handles merging/splitting).
-
-```sql
-CREATE TABLE refined_workflow_map (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  rawWorkflowId INTEGER NOT NULL,
-  refinedWorkflowId INTEGER NOT NULL,
-  FOREIGN KEY (rawWorkflowId) REFERENCES raw_workflows(id),
-  FOREIGN KEY (refinedWorkflowId) REFERENCES refined_workflows(id)
-);
-```
-
----
-
-## 5. Type Definitions
-
-```typescript
-// backend/types.ts
-
-export interface RecordedEvent {
-  id?: number;
-  sessionId: string;
-  timestamp: number;
-  url: string;
-  eventType: "click";
-  screenshotPath: string;
-  actionSummary: string;
-  screenSummary: string;
-}
-
-export interface WorkflowStep {
-  screen: string;
-  action: string;
-}
-
-export interface RawWorkflow {
-  steps: WorkflowStep[];
-}
-
-export interface RefinedWorkflow {
-  name: string;
-  description: string;
-  steps: WorkflowStep[];
-}
-
-export interface RawWorkflowRow {
-  id?: number;
-  sessionId: string;
-  workflowJson: RawWorkflow;
-  createdAt: number;
-}
-
-export interface RefinedWorkflowRow {
-  id?: number;
-  sessionId: string;
-  refinedJson: RefinedWorkflow;
-  createdAt: number;
-}
-
-export interface WorkflowMapping {
-  id?: number;
-  rawWorkflowId: number;
-  refinedWorkflowId: number;
-}
-```
-
----
-
-## 6. API Endpoints
-
-### `POST /ingest`
-Receives click events + screenshots from extension.
-
-**Request:**
-```json
-{
-  "payload": {
-    "sessionId": "uuid",
-    "timestamp": 1234567890,
-    "url": "https://example.com",
-    "eventType": "click",
-    "x": 100,
-    "y": 200
-  },
-  "screenshot": "data:image/png;base64,..."
-}
-```
-
-**Response:**
-```json
-{ "status": "ok" }
-```
-
-**Behavior:**
-1. Save screenshot to `storage/screenshots/{timestamp}.png`
-2. Call `summarizeAction()` → actionSummary
-3. Call `summarizeScreen()` → screenSummary
-4. Insert event into `events` table
-
----
-
-### `POST /finalize-session`
-Segments and refines workflows for a session.
-
-**Request:**
-```json
-{ "sessionId": "uuid" }
-```
-
-**Response:**
-```json
-{
-  "ok": true,
-  "raw": [{ "steps": [...] }, ...],
-  "refined": [{ "name": "...", "description": "...", "steps": [...] }, ...]
-}
-```
-
-**Behavior:**
-1. `segmentWorkflows(sessionId)` → raw workflows
-2. If empty: return `{ ok: true, raw: [], refined: [] }`
-3. Else: `refineWorkflows(raw)` → refined workflows
-4. Insert into `raw_workflows`, `refined_workflows`, `refined_workflow_map`
-5. Return results
-
----
-
-### `GET /workflows`
-Returns all refined workflows.
-
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "sessionId": "uuid",
-    "refinedJson": {
-      "name": "Create Patient",
-      "description": "Steps to create a new patient record",
-      "steps": [...]
-    },
-    "createdAt": 1234567890
-  }
-]
-```
-
----
-
-## 7. Workflow Segmentation Algorithm
-
-### Base Screen Detection
-- Count frequency of each `screenSummary` label
-- Top 1-2 most frequent = "base screens"
-
-### Segmentation Rules
-- **Start workflow**: Leaving a base screen (prev is base, current is not)
-- **End workflow**: Returning to base screen OR loop detected (screen label repeats in current workflow)
-
-### Pseudocode
-```
-baseScreens = top 2 frequent labels
-active = false
-steps = []
-
-for each event (starting from index 1):
-  leftBase = prev is base AND current is not base
-  returnedToBase = prev is not base AND current is base
-  loopDetected = current.screen already in steps
-
-  if leftBase:
-    steps = []
-    active = true
-
-  if active:
-    steps.push({ screen, action })
-
-  if active AND (returnedToBase OR loopDetected):
-    workflows.push({ steps })
-    steps = []
-    active = false
-```
-
----
-
-## 8. LLM Integration
-
-### Functions
-
-```typescript
-// Text-only prompt (for workflow refinement)
-callLLMText(prompt: string): Promise<string>
-
-// Vision prompt (for action/screen summaries)
-callLLMWithImage(prompt: string, imagePath: string): Promise<string>
-```
-
-### Prompts
-
-**Action Summary:**
-```
-Describe the user's action in one short sentence.
-Event: { eventType, url, x, y }
-Screenshot: [attached]
-```
-
-**Screen Summary:**
-```
-Name this screen in under 10 words. Use a clear, simple label.
-Screenshot: [attached]
-```
-
-**Workflow Refinement:**
-```
-You are analyzing user workflows extracted from a system.
-Your job:
-- Assign each workflow a clear name (2–5 words).
-- Assign each workflow a 1–2 sentence description.
-- Merge duplicate workflows if they represent the same task.
-- Maintain the same order of steps within each workflow.
-- Do not delete steps.
-- Do not add steps.
-
-Workflows (JSON):
-[...]
-
-Return JSON ONLY in this format:
-[
-  {
-    "name": "...",
-    "description": "...",
-    "steps": [{ "screen": "...", "action": "..." }, ...]
-  }
-]
-```
-
-### JSON Sanitization
-```typescript
-function sanitizeJSON(gptOutput: string): any {
-  let cleaned = gptOutput
-    .replace(/```json\n?/g, '')
-    .replace(/```\n?/g, '')
-    .trim();
-  return JSON.parse(cleaned);
-}
-```
-
----
-
-## 9. Chrome Extension Architecture
-
-### Session Management
-- Background script generates and owns `currentSessionId`
-- Stored in `chrome.storage.local` for persistence
-- Content scripts request sessionId via messaging
-- All tabs share same session until finalized
-
-### Message Types
-```typescript
-// Content → Background
-{ type: "GET_SESSION_ID" }
-{ type: "USER_EVENT", payload: {...} }
-
-// Popup → Background
-{ type: "RESET_SESSION" }
-
-// Background → Content/Popup
-{ sessionId: "uuid" }
-```
-
-### Flow
-1. Content script loads → requests sessionId from background
-2. User clicks → content script sends USER_EVENT to background
-3. Background waits 400ms (stabilization)
-4. Background captures screenshot via `chrome.tabs.captureVisibleTab`
-5. Background POSTs to `/ingest`
-
-### Popup
-- Shows current sessionId
-- "Stop & Finalize" button
-- On click: POST `/finalize-session`, then reset sessionId
-
----
-
-## 10. Implementation Phases
-
-### Phase 0: Repo + Tooling ✅
-- [x] Initialize npm project
-- [x] Install dependencies
-- [x] Configure TypeScript
-- [x] Configure Jest
-- [x] Configure esbuild for extension
-- [x] Create folder structure
-- [x] Create .env.example and .gitignore
-
-### Phase 1: Data Types + DB Layer ✅
-- [x] Write db.test.ts
-- [x] Implement types.ts
-- [x] Implement db.ts with all CRUD functions
-- [x] Tests pass (10 tests)
-
-### Phase 2: Workflow Segmentation ✅
-- [x] Write workflowSegmenter.test.ts
-- [x] Implement workflowSegmenter.ts
-- [x] Tests pass (7 tests)
-
-### Phase 3: LLM Wrappers ✅
-- [x] Write llm.test.ts with mocks
-- [x] Implement llm.ts (callLLMText, callLLMWithImage)
-- [x] Implement workflowRefiner.ts
-- [x] Implement sanitizeJSON
-- [x] Tests pass (14 tests)
-
-### Phase 4: Server Endpoints ✅
-- [x] Write server.test.ts
-- [x] Implement createApp() with routes
-- [x] Implement /ingest endpoint
-- [x] Implement /finalize-session endpoint
-- [x] Implement /workflows endpoint
-- [x] Tests pass (8 tests)
-
-### Phase 5: Frontend ✅
-- [x] Implement index.html with workflow cards
-- [x] Add static file serving
-- [x] Manual test: empty state displays correctly
-
-### Phase 6: Extension Core ✅
-- [x] Implement background.ts (sessionId management, screenshot capture)
-- [x] Implement contentScript.ts (click detection, messaging)
-- [x] Implement stabilization.ts
-- [x] Build with esbuild
-- [ ] Manual test: events reach backend (requires loading extension)
-
-### Phase 7: Extension Popup ✅
-- [x] Implement popup.html
-- [x] Implement popup.ts
-- [x] Add RESET_SESSION handler to background
-- [ ] Manual test: full flow works (requires loading extension)
-
-### Phase 8: Real GPT Wiring ⬜
-- [x] Implement actual OpenAI API calls (code ready)
-- [ ] Add OPENAI_API_KEY to .env
-- [ ] Test with real screenshots
-- [ ] End-to-end verification
-
----
-
-## 11. Environment Variables
+## 10. Environment Variables
 
 ```bash
-# .env
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=sk-...        # Required
+OPENAI_MODEL=gpt-4o          # Optional, default: gpt-4o
+API_URL=http://localhost:3000 # Optional, for extension
+PORT=3000                     # Optional, default: 3000
 ```
 
 ---
 
-## 12. Dependencies
+## 11. Testing
 
-### Production
-- express
-- cors
-- sqlite3
-- openai
-- dotenv
-
-### Development
-- typescript
-- @types/node
-- @types/express
-- @types/cors
-- jest
-- ts-jest
-- @types/jest
-- supertest
-- @types/supertest
-- esbuild
-
----
-
-## 13. Testing Strategy
-
-| Component | Testing Method |
-|-----------|----------------|
-| DB functions | Jest unit tests |
-| Workflow segmentation | Jest unit tests |
-| LLM helpers | Jest with mocks |
+| Component | Method |
+|-----------|--------|
+| DB operations | Jest unit tests |
+| Pipeline stages | Jest with mocked GPT |
 | Server endpoints | Jest + supertest |
 | Frontend | Manual browser testing |
 | Extension | Manual browser testing |
-| Real GPT | Manual verification |
+| Full flow | Simulations (e.g., EHR app) |
 
-### Test Isolation
-- Use in-memory SQLite (`:memory:`) or temp files per test suite
-- Mock all LLM calls in automated tests
-- Never hit real GPT in CI
+```bash
+npm test                  # Run all tests
+npm test -- --coverage    # With coverage
+```
+
+---
+
+## 12. Simulations
+
+Standalone test apps in `simulations/` directory:
+
+| Name | Port | Description |
+|------|------|-------------|
+| `ehr` | 3001 | Electronic Health Records - patients, insurance, providers, drug referrals |
+
+```bash
+cd simulations/ehr
+npm install
+npm run dev
+# Open http://localhost:3001
+```
 
 ---
 
@@ -529,5 +398,5 @@ OPENAI_API_KEY=sk-...
 
 | Date | Change |
 |------|--------|
-| 2025-12-05 | Initial document created |
-
+| 2025-12-05 | v1.0 - Initial design with segmenter/refiner |
+| 2025-12-07 | v2.0 - Complete rewrite: template/instance model, pipeline architecture |
