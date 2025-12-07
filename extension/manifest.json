@@ -24,10 +24,8 @@
     {
       "matches": ["<all_urls>"],
       "exclude_matches": [
-        "http://localhost/*",
-        "http://localhost:*/*",
-        "http://127.0.0.1/*",
-        "http://127.0.0.1:*/*"
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
       ],
       "js": ["dist/contentScript.js"],
       "run_at": "document_idle"

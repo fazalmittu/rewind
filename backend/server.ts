@@ -66,13 +66,17 @@ export function createApp(): Express {
 
   // Ingest endpoint - receives events + screenshots from extension
   app.post("/ingest", async (req, res) => {
+    console.log("[Ingest] Received event request");
     try {
       const { payload, screenshot } = req.body as IngestRequest;
 
       if (!payload || !screenshot) {
+        console.log("[Ingest] Missing payload or screenshot");
         res.status(400).json({ error: "Missing payload or screenshot" });
         return;
       }
+      
+      console.log(`[Ingest] Event: ${payload.eventType} from session ${payload.sessionId}`);
 
       // Save screenshot
       const screenshotsDir = path.join(__dirname, "..", "storage", "screenshots");

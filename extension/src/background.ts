@@ -112,9 +112,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "USER_EVENT") {
+    console.log("[Workflow Recorder] USER_EVENT received, isRecording:", isRecording, "sessionId:", currentSessionId);
     // Only process if recording is active
     if (isRecording && currentSessionId) {
       handleUserEvent(msg.payload);
+    } else {
+      console.log("[Workflow Recorder] Skipping event - not recording");
     }
     return true;
   }
