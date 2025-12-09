@@ -20,12 +20,10 @@ export default function PropertiesPanel({
   const [localName, setLocalName] = useState(template.name)
   const [localDescription, setLocalDescription] = useState(template.description)
 
-  // Sync local state with selected step
   useEffect(() => {
     setLocalStep(selectedStep)
   }, [selectedStep])
 
-  // Sync template name/description
   useEffect(() => {
     setLocalName(template.name)
     setLocalDescription(template.description)
@@ -59,7 +57,6 @@ export default function PropertiesPanel({
     }
   }
 
-  // Show step properties if a step is selected
   if (selectedStep && localStep) {
     return (
       <div className="p-4">
@@ -69,7 +66,6 @@ export default function PropertiesPanel({
           </h2>
         </div>
 
-        {/* Screen Pattern */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Screen
@@ -90,7 +86,6 @@ export default function PropertiesPanel({
                 {localStep.screenPattern}
               </option>
             )}
-            {/* Allow custom screen if not in list */}
             {!screens.find(s => s.label === localStep.screenPattern) && (
               <option value={localStep.screenPattern}>
                 {localStep.screenPattern} (custom)
@@ -99,7 +94,6 @@ export default function PropertiesPanel({
           </select>
         </div>
 
-        {/* Action Template */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Action
@@ -116,7 +110,6 @@ export default function PropertiesPanel({
           </p>
         </div>
 
-        {/* Uses Inputs */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Uses Inputs
@@ -143,7 +136,6 @@ export default function PropertiesPanel({
           )}
         </div>
 
-        {/* Extracts (read-only for now) */}
         {Object.keys(localStep.extracts).length > 0 && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -163,7 +155,6 @@ export default function PropertiesPanel({
     )
   }
 
-  // Show template properties when no step is selected
   return (
     <div className="p-4">
       <div className="mb-4">
@@ -172,7 +163,6 @@ export default function PropertiesPanel({
         </h2>
       </div>
 
-      {/* Template Name */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Name
@@ -186,7 +176,6 @@ export default function PropertiesPanel({
         />
       </div>
 
-      {/* Template Description */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Description
@@ -200,7 +189,6 @@ export default function PropertiesPanel({
         />
       </div>
 
-      {/* Inputs Summary */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Inputs
@@ -221,7 +209,6 @@ export default function PropertiesPanel({
         )}
       </div>
 
-      {/* Outputs Summary */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Outputs
@@ -241,7 +228,6 @@ export default function PropertiesPanel({
         )}
       </div>
 
-      {/* Stats */}
       <div className="pt-4 border-t border-gray-100">
         <div className="text-xs text-gray-400 space-y-1">
           <p>Steps: {template.steps.length}</p>
