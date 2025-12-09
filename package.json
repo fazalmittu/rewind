@@ -8,6 +8,9 @@
     "build": "tsc",
     "build:extension": "node esbuild.config.js",
     "watch:extension": "node esbuild.config.js --watch",
+    "build:workflow-map": "cd frontend/workflow-map && npm run build",
+    "install:workflow-map": "cd frontend/workflow-map && npm install",
+    "dev:workflow-map": "cd frontend/workflow-map && npm run dev",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

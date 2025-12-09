@@ -225,6 +225,63 @@ export const getWorkflowTemplateById = (id: string): Promise<WorkflowTemplate | 
   });
 };
 
+export const updateWorkflowTemplate = (
+  id: string,
+  updates: Partial<WorkflowTemplate>
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    getWorkflowTemplateById(id).then((existing) => {
+      if (!existing) {
+        reject(new Error("Template not found"));
+        return;
+      }
+
+      const updated: WorkflowTemplate = {
+        ...existing,
+        ...updates,
+        id,
+        updatedAt: Date.now(),
+      };
+
+      db.run(
+        `UPDATE workflow_templates 
+         SET name = ?, description = ?, inputsJson = ?, outputsJson = ?, stepsJson = ?, updatedAt = ?
+         WHERE id = ?`,
+        [
+          updated.name,
+          updated.description,
+          JSON.stringify(updated.inputs),
+          JSON.stringify(updated.outputs),
+          JSON.stringify(updated.steps),
+          updated.updatedAt,
+          id,
+        ],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    }).catch(reject);
+  });
+};
+
+export const deleteWorkflowTemplate = (id: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run(`DELETE FROM workflow_instances WHERE templateId = ?`, [id], (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        db.run(`DELETE FROM workflow_templates WHERE id = ?`, [id], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    });
+  });
+};
+
 // ============================================
 // WORKFLOW INSTANCES
 // ============================================
