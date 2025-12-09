@@ -1,11 +1,15 @@
+/**
+ * App.tsx
+ * Root component with three-panel layout: template list, canvas, properties.
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import WorkflowCanvas from './components/WorkflowCanvas'
 import TemplateList from './components/TemplateList'
 import PropertiesPanel from './components/PropertiesPanel'
+import { fetchInitialData, saveTemplate } from './api'
 import { WorkflowTemplate, TemplateStep, CanonicalScreen } from './types'
-
-const API_BASE = ''
 
 function App() {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([])
@@ -15,20 +19,16 @@ function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${API_BASE}/templates`).then(r => r.json()),
-      fetch(`${API_BASE}/screens`).then(r => r.json())
-    ])
+    fetchInitialData()
       .then(([templatesData, screensData]) => {
         setTemplates(templatesData)
         setScreens(screensData)
+        
         const params = new URLSearchParams(window.location.search)
         const templateId = params.get('template')
         if (templateId) {
-          const template = templatesData.find((t: WorkflowTemplate) => t.id === templateId)
-          if (template) {
-            setSelectedTemplate(template)
-          }
+          const template = templatesData.find(t => t.id === templateId)
+          if (template) setSelectedTemplate(template)
         }
       })
       .catch(console.error)
@@ -75,9 +75,8 @@ function App() {
   const handleAddStep = useCallback(() => {
     if (!selectedTemplate) return
     
-    const newStepNumber = selectedTemplate.steps.length + 1
     const newStep: TemplateStep = {
-      stepNumber: newStepNumber,
+      stepNumber: selectedTemplate.steps.length + 1,
       screenPattern: screens[0]?.label || 'New Screen',
       actionTemplate: 'New action',
       usesInputs: [],
@@ -118,13 +117,7 @@ function App() {
     if (!selectedTemplate) return
     
     try {
-      const response = await fetch(`${API_BASE}/templates/${selectedTemplate.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selectedTemplate)
-      })
-      
-      if (!response.ok) throw new Error('Failed to save')
+      await saveTemplate(selectedTemplate)
       alert('Template saved successfully!')
     } catch (error) {
       console.error('Save error:', error)
@@ -158,14 +151,12 @@ function App() {
           )}
         </div>
         {selectedTemplate && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleSaveTemplate}
-              className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
-            >
-              Save Changes
-            </button>
-          </div>
+          <button
+            onClick={handleSaveTemplate}
+            className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
+          >
+            Save Changes
+          </button>
         )}
       </header>
 
@@ -187,7 +178,6 @@ function App() {
                 onSelectStep={handleSelectStep}
                 onAddStep={handleAddStep}
                 onDeleteStep={handleDeleteStep}
-                onUpdateTemplate={handleUpdateTemplate}
               />
             </ReactFlowProvider>
           ) : (
@@ -221,4 +211,3 @@ function App() {
 }
 
 export default App
-

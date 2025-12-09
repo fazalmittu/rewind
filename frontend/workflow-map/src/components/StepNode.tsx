@@ -1,3 +1,8 @@
+/**
+ * StepNode.tsx
+ * Custom React Flow node for workflow steps.
+ */
+
 import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { TemplateStep } from '../types'
@@ -12,25 +17,25 @@ interface StepNodeProps {
   data: StepNodeData
 }
 
+function highlightParams(text: string) {
+  const parts = text.split(/(\{[^}]+\})/)
+  return parts.map((part, i) => {
+    if (part.match(/^\{[^}]+\}$/)) {
+      return (
+        <span
+          key={i}
+          className="inline-block bg-blue-100 text-blue-700 px-1 rounded text-xs font-mono"
+        >
+          {part}
+        </span>
+      )
+    }
+    return part
+  })
+}
+
 function StepNode({ data }: StepNodeProps) {
   const { step, isSelected, onDelete } = data
-
-  const highlightParams = (text: string) => {
-    const parts = text.split(/(\{[^}]+\})/)
-    return parts.map((part, i) => {
-      if (part.match(/^\{[^}]+\}$/)) {
-        return (
-          <span
-            key={i}
-            className="inline-block bg-blue-100 text-blue-700 px-1 rounded text-xs font-mono"
-          >
-            {part}
-          </span>
-        )
-      }
-      return part
-    })
-  }
 
   return (
     <div
@@ -114,4 +119,3 @@ function StepNode({ data }: StepNodeProps) {
 }
 
 export default memo(StepNode)
-

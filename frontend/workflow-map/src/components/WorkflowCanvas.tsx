@@ -1,3 +1,8 @@
+/**
+ * WorkflowCanvas.tsx
+ * React Flow canvas for rendering workflow diagrams with pan/zoom and PNG export.
+ */
+
 import { useCallback, useEffect } from 'react'
 import { toPng } from 'html-to-image'
 import {
@@ -19,6 +24,20 @@ import '@xyflow/react/dist/style.css'
 import StepNode from './StepNode'
 import { StartNode, EndNode } from './StartEndNodes'
 import { WorkflowTemplate, TemplateStep } from '../types'
+import {
+  NODE_SPACING_X,
+  NODE_OFFSET_X,
+  NODE_Y,
+  START_END_Y,
+  END_NODE_OFFSET,
+  EXPORT_PADDING,
+  COLORS,
+  EDGE_STYLE,
+  START_EDGE_STYLE,
+  END_EDGE_STYLE,
+  REACT_FLOW_CONFIG,
+  MINIMAP_CONFIG,
+} from '../constants'
 
 interface WorkflowCanvasProps {
   template: WorkflowTemplate
@@ -26,7 +45,6 @@ interface WorkflowCanvasProps {
   onSelectStep: (step: TemplateStep | null) => void
   onAddStep: () => void
   onDeleteStep: (stepNumber: number) => void
-  onUpdateTemplate?: (updates: Partial<WorkflowTemplate>) => void
 }
 
 const nodeTypes = {
@@ -34,16 +52,6 @@ const nodeTypes = {
   startNode: StartNode,
   endNode: EndNode,
 }
-
-const NODE_SPACING_X = 500
-const NODE_OFFSET_X = 150
-const NODE_Y = 100
-const START_END_Y = 124
-const END_NODE_OFFSET = 350
-
-const EDGE_STYLE = { stroke: '#9ca3af', strokeWidth: 2 }
-const START_EDGE_STYLE = { stroke: '#22c55e', strokeWidth: 2 }
-const END_EDGE_STYLE = { stroke: '#ef4444', strokeWidth: 2 }
 
 const makeMarker = (color: string) => ({ type: MarkerType.ArrowClosed, color })
 
@@ -56,6 +64,7 @@ export default function WorkflowCanvas({
 }: WorkflowCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const { getNodes } = useReactFlow()
 
   useEffect(() => {
     const stepNodes = template.steps.map((step, index) => ({
@@ -85,7 +94,7 @@ export default function WorkflowCanvas({
       target: `step-${template.steps[index + 1].stepNumber}`,
       type: 'smoothstep',
       style: EDGE_STYLE,
-      markerEnd: makeMarker('#9ca3af'),
+      markerEnd: makeMarker(COLORS.edge),
     }))
 
     const firstStep = template.steps[0]
@@ -98,7 +107,7 @@ export default function WorkflowCanvas({
         target: firstStep ? `step-${firstStep.stepNumber}` : 'end',
         type: 'smoothstep',
         style: START_EDGE_STYLE,
-        markerEnd: makeMarker('#22c55e'),
+        markerEnd: makeMarker(COLORS.start),
       },
       ...stepEdges,
       ...(lastStep ? [{
@@ -107,7 +116,7 @@ export default function WorkflowCanvas({
         target: 'end',
         type: 'smoothstep',
         style: END_EDGE_STYLE,
-        markerEnd: makeMarker('#ef4444'),
+        markerEnd: makeMarker(COLORS.end),
       }] : []),
     ])
   }, [template.steps, setEdges])
@@ -124,28 +133,17 @@ export default function WorkflowCanvas({
     onSelectStep(null)
   }, [onSelectStep])
 
-  const { getNodes } = useReactFlow()
-
   const onDownload = useCallback(() => {
     const nodesBounds = getNodesBounds(getNodes())
-    const padding = 50
-    const width = nodesBounds.width + padding * 2
-    const height = nodesBounds.height + padding * 2
+    const width = nodesBounds.width + EXPORT_PADDING * 2
+    const height = nodesBounds.height + EXPORT_PADDING * 2
     
-    const viewport = getViewportForBounds(
-      nodesBounds,
-      width,
-      height,
-      0.5,
-      2,
-      padding
-    )
-
+    const viewport = getViewportForBounds(nodesBounds, width, height, 0.5, 2, EXPORT_PADDING)
     const viewportElement = document.querySelector('.react-flow__viewport') as HTMLElement
     if (!viewportElement) return
 
     toPng(viewportElement, {
-      backgroundColor: '#f9fafb',
+      backgroundColor: COLORS.exportBackground,
       width,
       height,
       style: {
@@ -174,25 +172,30 @@ export default function WorkflowCanvas({
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.3}
-        maxZoom={1.5}
+        fitViewOptions={{ padding: REACT_FLOW_CONFIG.fitViewPadding }}
+        minZoom={REACT_FLOW_CONFIG.minZoom}
+        maxZoom={REACT_FLOW_CONFIG.maxZoom}
         defaultEdgeOptions={{
           type: 'smoothstep',
           style: EDGE_STYLE,
-          markerEnd: makeMarker('#9ca3af'),
+          markerEnd: makeMarker(COLORS.edge),
         }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e5e7eb" />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={COLORS.gridDots} />
         <Controls showInteractive={false} />
         <MiniMap 
           nodeColor={(node) => {
-            if (node.type === 'startNode') return '#22c55e'
-            if (node.type === 'endNode') return '#ef4444'
-            return '#6b7280'
+            if (node.type === 'startNode') return COLORS.start
+            if (node.type === 'endNode') return COLORS.end
+            return COLORS.stepMinimap
           }}
-          maskColor="rgba(0, 0, 0, 0.1)"
-          style={{ width: 120, height: 80, bottom: 70, right: 10 }}
+          maskColor={MINIMAP_CONFIG.maskColor}
+          style={{ 
+            width: MINIMAP_CONFIG.width, 
+            height: MINIMAP_CONFIG.height, 
+            bottom: MINIMAP_CONFIG.bottom, 
+            right: MINIMAP_CONFIG.right 
+          }}
         />
       </ReactFlow>
 

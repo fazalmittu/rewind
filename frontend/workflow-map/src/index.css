@@ -1,3 +1,8 @@
+/**
+ * index.css
+ * Global styles and React Flow customizations.
+ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -42,4 +47,3 @@ body {
   border: 1px solid #e5e5e5;
   overflow: hidden;
 }
-

@@ -1,3 +1,8 @@
+/**
+ * PropertiesPanel.tsx
+ * Right sidebar for editing workflow and step properties.
+ */
+
 import { useState, useEffect } from 'react'
 import { WorkflowTemplate, TemplateStep, CanonicalScreen } from '../types'
 
@@ -238,4 +243,3 @@ export default function PropertiesPanel({
     </div>
   )
 }
-

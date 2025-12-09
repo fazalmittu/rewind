@@ -1,3 +1,8 @@
+/**
+ * StartEndNodes.tsx
+ * Terminal node components marking workflow start and end.
+ */
+
 import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 
@@ -26,4 +31,3 @@ export const EndNode = memo(function EndNode() {
     </div>
   )
 })
-

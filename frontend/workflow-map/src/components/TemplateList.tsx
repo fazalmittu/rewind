@@ -1,3 +1,8 @@
+/**
+ * TemplateList.tsx
+ * Left sidebar listing available workflow templates.
+ */
+
 import { WorkflowTemplate } from '../types'
 
 interface TemplateListProps {
@@ -6,7 +11,11 @@ interface TemplateListProps {
   onSelect: (template: WorkflowTemplate) => void
 }
 
-export default function TemplateList({ templates, selectedTemplate, onSelect }: TemplateListProps) {
+export default function TemplateList({ 
+  templates, 
+  selectedTemplate, 
+  onSelect 
+}: TemplateListProps) {
   if (templates.length === 0) {
     return (
       <div className="p-4">
@@ -61,4 +70,3 @@ export default function TemplateList({ templates, selectedTemplate, onSelect }: 
     </div>
   )
 }
-
