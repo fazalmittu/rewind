@@ -14,7 +14,6 @@ function App() {
   const [selectedStep, setSelectedStep] = useState<TemplateStep | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Load templates and screens on mount
   useEffect(() => {
     Promise.all([
       fetch(`${API_BASE}/templates`).then(r => r.json()),
@@ -23,8 +22,6 @@ function App() {
       .then(([templatesData, screensData]) => {
         setTemplates(templatesData)
         setScreens(screensData)
-        
-        // Check URL for template ID
         const params = new URLSearchParams(window.location.search)
         const templateId = params.get('template')
         if (templateId) {
@@ -41,7 +38,6 @@ function App() {
   const handleSelectTemplate = useCallback((template: WorkflowTemplate) => {
     setSelectedTemplate(template)
     setSelectedStep(null)
-    // Update URL
     const url = new URL(window.location.href)
     url.searchParams.set('template', template.id)
     window.history.pushState({}, '', url.toString())
@@ -61,8 +57,6 @@ function App() {
     const updatedTemplate = { ...selectedTemplate, steps: updatedSteps }
     setSelectedTemplate(updatedTemplate)
     setSelectedStep(updatedStep)
-    
-    // Update in templates list
     setTemplates(prev => prev.map(t => 
       t.id === updatedTemplate.id ? updatedTemplate : t
     ))
@@ -148,7 +142,6 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <a 
@@ -176,9 +169,7 @@ function App() {
         )}
       </header>
 
-      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar - Template List */}
         <aside className="w-64 bg-white border-r border-gray-200 overflow-y-auto">
           <TemplateList
             templates={templates}
@@ -187,7 +178,6 @@ function App() {
           />
         </aside>
 
-        {/* Canvas */}
         <main className="flex-1 relative">
           {selectedTemplate ? (
             <ReactFlowProvider>
@@ -214,7 +204,6 @@ function App() {
           )}
         </main>
 
-        {/* Properties Panel */}
         {selectedTemplate && (
           <aside className="w-80 bg-white border-l border-gray-200 overflow-y-auto">
             <PropertiesPanel

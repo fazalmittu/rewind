@@ -27,6 +27,10 @@ const nodeTypes = {
   stepNode: StepNode,
 }
 
+const NODE_SPACING_X = 500
+const NODE_OFFSET_X = 50
+const NODE_Y = 100
+
 export default function WorkflowCanvas({
   template,
   selectedStep,
@@ -38,7 +42,7 @@ export default function WorkflowCanvas({
     return template.steps.map((step, index) => ({
       id: `step-${step.stepNumber}`,
       type: 'stepNode',
-      position: { x: 300, y: index * 180 + 50 },
+      position: { x: index * NODE_SPACING_X + NODE_OFFSET_X, y: NODE_Y },
       data: {
         step,
         isSelected: selectedStep?.stepNumber === step.stepNumber,
@@ -71,8 +75,8 @@ export default function WorkflowCanvas({
         id: `step-${step.stepNumber}`,
         type: 'stepNode',
         position: nodes.find(n => n.id === `step-${step.stepNumber}`)?.position || {
-          x: 300,
-          y: index * 180 + 50,
+          x: index * NODE_SPACING_X + NODE_OFFSET_X,
+          y: NODE_Y,
         },
         data: {
           step,
