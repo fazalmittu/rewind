@@ -18,6 +18,11 @@ const API_URL = process.env.API_URL || "http://localhost:3000";
 let currentSessionId: string | null = null;
 let isRecording: boolean = false;
 
+const Commands = {
+  TOGGLE_RECORDING: "toggle-recording",
+  FINALIZE_SESSION: "finalize-session",
+} as const;
+
 /**
  * Update the extension badge to reflect recording state
  */
@@ -249,10 +254,10 @@ async function finalizeSession(): Promise<boolean> {
 }
 
 /**
- * Handle keyboard shortcut commands
+ * Handle keyboard shortcut commands.
  */
 chrome.commands.onCommand.addListener(async (command) => {
-  if (command === "toggle-recording") {
+  if (command === Commands.TOGGLE_RECORDING) {
     if (isRecording) {
       stopRecording();
     } else {
@@ -260,7 +265,7 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
   }
 
-  if (command === "finalize-session" && currentSessionId) {
+  if (command === Commands.FINALIZE_SESSION && currentSessionId) {
     await finalizeSession();
   }
 });
