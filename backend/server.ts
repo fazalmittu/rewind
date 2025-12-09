@@ -2,12 +2,17 @@ import express, { Express } from "express";
 import cors from "cors";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import livereload from "livereload";
 import connectLivereload from "connect-livereload";
 import {
   clearAllData,
   getTemplatesWithInstances,
   getAllCanonicalScreens,
+  updateWorkflowTemplate,
+  deleteWorkflowTemplate,
+  insertWorkflowTemplate,
+  getWorkflowTemplateById,
 } from "./db";
 import { sessionStore } from "./sessionStore";
 import { runFinalizationPipeline } from "./pipeline";
@@ -29,8 +34,8 @@ export function createApp(): Express {
   //   console.log("[LiveReload] Watching frontend/ for changes");
   // }
 
-  // Serve frontend static files
-  app.use("/", express.static(path.join(__dirname, "..", "frontend")));
+  // Serve frontend dashboard static files
+  app.use("/", express.static(path.join(__dirname, "..", "frontend", "dashboard")));
 
   // Serve assets (logo, etc.)
   app.use("/assets", express.static(path.join(__dirname, "..", "assets")));
@@ -188,6 +193,72 @@ export function createApp(): Express {
       console.error("Get screens error:", error);
       res.status(500).json({ error: "Failed to get screens" });
     }
+  });
+
+  // Get a single template by ID
+  app.get("/templates/:id", async (req, res) => {
+    try {
+      const template = await getWorkflowTemplateById(req.params.id);
+      if (!template) {
+        res.status(404).json({ error: "Template not found" });
+        return;
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Get template error:", error);
+      res.status(500).json({ error: "Failed to get template" });
+    }
+  });
+
+  // Update a template
+  app.patch("/templates/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      delete updates.id;
+      delete updates.instances;
+      await updateWorkflowTemplate(id, updates);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Update template error:", error);
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  // Create a new template
+  app.post("/templates", async (req, res) => {
+    try {
+      const template = req.body;
+      if (!template.id) {
+        template.id = `tmpl_${crypto.randomUUID().slice(0, 8)}`;
+      }
+      const now = Date.now();
+      template.createdAt = template.createdAt || now;
+      template.updatedAt = now;
+      await insertWorkflowTemplate(template);
+      res.json({ ok: true, id: template.id });
+    } catch (error) {
+      console.error("Create template error:", error);
+      res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  // Delete a template
+  app.delete("/templates/:id", async (req, res) => {
+    try {
+      await deleteWorkflowTemplate(req.params.id);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Delete template error:", error);
+      res.status(500).json({ error: "Failed to delete template" });
+    }
+  });
+
+  // Serve workflow map React app
+  const workflowMapPath = path.join(__dirname, "..", "frontend", "workflow-map", "dist");
+  app.use("/workflow-map", express.static(workflowMapPath));
+  app.get(/^\/workflow-map(?:\/.*)?$/, (_, res) => {
+    res.sendFile(path.join(workflowMapPath, "index.html"));
   });
 
   // Reset database - clears all data
