@@ -39,5 +39,21 @@
     },
     "default_popup": "popup.html",
     "default_title": "Rewind"
+  },
+  "commands": {
+    "toggle-recording": {
+      "suggested_key": {
+        "default": "Alt+Shift+R",
+        "mac": "Alt+Shift+R"
+      },
+      "description": "Start or stop recording"
+    },
+    "finalize-session": {
+      "suggested_key": {
+        "default": "Alt+Shift+F",
+        "mac": "Alt+Shift+F"
+      },
+      "description": "Stop and finalize the current session"
+    }
   }
 }

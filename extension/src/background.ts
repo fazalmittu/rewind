@@ -7,6 +7,7 @@
  * - Receive events from content scripts (clicks, inputs, changes, submits)
  * - Capture screenshots
  * - Send events + screenshots to backend
+ * - Handle keyboard shortcuts
  */
 
 import { waitForStabilizedState } from "./stabilization";
@@ -17,10 +18,23 @@ const API_URL = process.env.API_URL || "http://localhost:3000";
 let currentSessionId: string | null = null;
 let isRecording: boolean = false;
 
+/**
+ * Update the extension badge to reflect recording state
+ */
+function updateBadge(): void {
+  if (isRecording) {
+    chrome.action.setBadgeText({ text: "REC" });
+    chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+  } else {
+    chrome.action.setBadgeText({ text: "" });
+  }
+}
+
 // Restore state on worker activation (service workers can restart)
 chrome.storage.local.get(["currentSessionId", "isRecording"]).then((data) => {
   currentSessionId = data.currentSessionId || null;
   isRecording = data.isRecording || false;
+  updateBadge();
   console.log("[Workflow Recorder] Background ready, recording:", isRecording, "session:", currentSessionId);
 });
 
@@ -31,6 +45,7 @@ function startRecording(): { sessionId: string } {
   currentSessionId = crypto.randomUUID();
   isRecording = true;
   chrome.storage.local.set({ currentSessionId, isRecording });
+  updateBadge();
   console.log("[Workflow Recorder] Recording STARTED, session ID:", currentSessionId);
 
   // Notify all content scripts
@@ -45,6 +60,7 @@ function startRecording(): { sessionId: string } {
 function stopRecording(): void {
   isRecording = false;
   chrome.storage.local.set({ isRecording });
+  updateBadge();
   console.log("[Workflow Recorder] Recording STOPPED");
 
   // Notify all content scripts
@@ -58,6 +74,7 @@ function clearSession(): void {
   currentSessionId = null;
   isRecording = false;
   chrome.storage.local.set({ currentSessionId: null, isRecording: false });
+  updateBadge();
   console.log("[Workflow Recorder] Session cleared");
 
   // Notify all content scripts
@@ -195,5 +212,57 @@ async function handleUserEvent(payload: {
     console.error("[Workflow Recorder] Error handling event:", error);
   }
 }
+
+/**
+ * Finalize the current session by sending to backend
+ */
+async function finalizeSession(): Promise<boolean> {
+  if (!currentSessionId) {
+    console.log("[Workflow Recorder] No session to finalize");
+    return false;
+  }
+
+  const sessionIdToFinalize = currentSessionId;
+  
+  try {
+    stopRecording();
+    
+    const response = await fetch(`${API_URL}/finalize-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: sessionIdToFinalize }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("[Workflow Recorder] Session finalized:", result);
+    
+    clearSession();
+    return true;
+  } catch (error) {
+    console.error("[Workflow Recorder] Finalize error:", error);
+    return false;
+  }
+}
+
+/**
+ * Handle keyboard shortcut commands
+ */
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === "toggle-recording") {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }
+
+  if (command === "finalize-session" && currentSessionId) {
+    await finalizeSession();
+  }
+});
 
 console.log("[Workflow Recorder] Background service worker loaded");
