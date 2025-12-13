@@ -2,50 +2,24 @@
   "name": "workflow-recorder",
   "version": "1.0.0",
   "description": "Vision-only workflow recorder for browser applications",
-  "main": "backend/index.ts",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only backend/index.ts",
-    "build": "tsc",
-    "build:extension": "node esbuild.config.js",
-    "watch:extension": "node esbuild.config.js --watch",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "dev": "bun --watch backend/index.ts",
+    "build:extension": "bun run scripts/build-extension.ts",
+    "watch:extension": "bun run scripts/build-extension.ts --watch",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
-  "keywords": [
-    "workflow",
-    "recorder",
-    "browser",
-    "extension",
-    "ai"
-  ],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "openai": "^6.10.0",
-    "sqlite3": "^5.1.7"
+    "openai": "^6.10.0"
   },
   "devDependencies": {
+    "@types/bun": "latest",
     "@types/chrome": "^0.1.32",
-    "@types/connect-livereload": "^0.6.3",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/jest": "^30.0.0",
-    "@types/livereload": "^0.9.5",
-    "@types/node": "^24.10.1",
-    "@types/supertest": "^6.0.3",
-    "connect-livereload": "^0.6.1",
-    "esbuild": "^0.27.1",
-    "jest": "^30.2.0",
-    "livereload": "^0.10.3",
-    "sharp": "^0.34.5",
-    "supertest": "^7.1.4",
-    "ts-jest": "^29.4.6",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.3"
+    "sharp": "^0.34.5"
   }
 }

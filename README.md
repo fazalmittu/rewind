@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Extension">
-  <img src="https://img.shields.io/badge/Node.js-Backend-339933?logo=nodedotjs&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/Bun-Runtime-000000?logo=bun&logoColor=white" alt="Bun">
   <img src="https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white" alt="SQLite">
 </p>
 
@@ -75,12 +75,20 @@ Canonical Screens  →  Workflow Templates  →  Workflow Instances
 
 ## Setup
 
-### 1. Install
+### 1. Install Bun
+
 ```bash
-npm install
+curl -fsSL https://bun.sh/install | bash
 ```
 
-### 2. Configure
+### 2. Install Dependencies
+
+```bash
+bun install
+```
+
+### 3. Configure
+
 ```bash
 cp .env.example .env
 # Add your OpenAI API key
@@ -92,18 +100,21 @@ OPENAI_MODEL=gpt-5.1              # optional
 API_URL=http://localhost:3000     # optional
 ```
 
-### 3. Run
+### 4. Run
+
 ```bash
-npm run build:extension
-npm run dev
+bun run build:extension
+bun run dev
 ```
 
-### 4. Load Extension
+### 5. Load Extension
+
 1. Chrome → `chrome://extensions/`
 2. Enable "Developer mode"
 3. "Load unpacked" → select `extension/` folder
 
-### 5. Use It
+### 6. Use It
+
 1. Click Rewind icon
 2. Start Recording
 3. Do stuff in a web app
@@ -118,7 +129,7 @@ npm run dev
 rewind/
 ├── backend/
 │   ├── pipeline/           # The 3 processing stages
-│   ├── db.ts               # SQLite stuff
+│   ├── db.ts               # SQLite (bun:sqlite)
 │   ├── llm.ts              # OpenAI calls
 │   ├── sessionStore.ts     # In-memory session state
 │   └── server.ts           # Express routes
@@ -137,10 +148,12 @@ rewind/
 ## Scripts
 
 ```bash
-npm run dev              # Backend with hot reload
-npm run build:extension  # Build extension
-npm run watch:extension  # Watch mode
-npm test                 # Tests
+bun run dev              # Backend with hot reload
+bun run build:extension  # Build extension
+bun run watch:extension  # Watch mode
+bun test                 # Tests
+bun test --watch         # Watch mode tests
+bun test --coverage      # Coverage report
 ```
 
 ---
@@ -153,9 +166,9 @@ It lives in `simulations`. There's a README in there with instructions for how a
 
 ```bash
 cd simulations/ehr
-npm install
-npm run seed    # Populate with fake data
-npm run dev     # Runs on localhost:3001
+bun install
+bun run seed    # Populate with fake data
+bun run dev     # Runs on localhost:3001
 ```
 
 ---

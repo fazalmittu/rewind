@@ -1,44 +1,38 @@
+import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test";
 import { CapturedEvent, CanonicalScreen } from "../types";
-
-// Mock the LLM module
-jest.mock("../llm", () => ({
-  callLLMText: jest.fn(),
-  sanitizeJSON: jest.fn((json: string) => JSON.parse(json)),
-}));
-
-import { canonicalizeScreens } from "../pipeline/screenCanonicalizer";
-import { segmentInstances } from "../pipeline/instanceSegmenter";
-import { synthesizeTemplate } from "../pipeline/templateSynthesizer";
-import { callLLMText } from "../llm";
-
-const mockCallLLMText = callLLMText as jest.MockedFunction<typeof callLLMText>;
+import * as llm from "../llm";
 
 describe("Screen Canonicalizer", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    mock.restore();
   });
 
   it("should return empty for no events", async () => {
+    const { canonicalizeScreens } = await import("../pipeline/screenCanonicalizer");
     const result = await canonicalizeScreens([]);
     expect(result.screens).toHaveLength(0);
     expect(result.eventScreenMappings.size).toBe(0);
   });
 
   it("should canonicalize screens from events", async () => {
-    mockCallLLMText.mockResolvedValue(JSON.stringify({
-      screenTypes: [
-        {
-          groupIds: [0],
-          canonicalLabel: "Product Detail Page",
-          description: "Page showing product details",
-        },
-        {
-          groupIds: [1],
-          canonicalLabel: "Shopping Cart",
-          description: "Shopping cart page",
-        },
-      ],
-    }));
+    spyOn(llm, "callLLMText").mockResolvedValue(
+      JSON.stringify({
+        screenTypes: [
+          {
+            groupIds: [0],
+            canonicalLabel: "Product Detail Page",
+            description: "Page showing product details",
+          },
+          {
+            groupIds: [1],
+            canonicalLabel: "Shopping Cart",
+            description: "Shopping cart page",
+          },
+        ],
+      })
+    );
+
+    const { canonicalizeScreens } = await import("../pipeline/screenCanonicalizer");
 
     const events: CapturedEvent[] = [
       {
@@ -60,20 +54,24 @@ describe("Screen Canonicalizer", () => {
     const result = await canonicalizeScreens(events);
 
     expect(result.screens).toHaveLength(2);
-    expect(result.screens.map(s => s.label)).toContain("Product Detail Page");
-    expect(result.screens.map(s => s.label)).toContain("Shopping Cart");
+    expect(result.screens.map((s) => s.label)).toContain("Product Detail Page");
+    expect(result.screens.map((s) => s.label)).toContain("Shopping Cart");
   });
 
   it("should group same URL patterns together", async () => {
-    mockCallLLMText.mockResolvedValue(JSON.stringify({
-      screenTypes: [
-        {
-          groupIds: [0],
-          canonicalLabel: "Product Detail Page",
-          description: "Page showing product details",
-        },
-      ],
-    }));
+    spyOn(llm, "callLLMText").mockResolvedValue(
+      JSON.stringify({
+        screenTypes: [
+          {
+            groupIds: [0],
+            canonicalLabel: "Product Detail Page",
+            description: "Page showing product details",
+          },
+        ],
+      })
+    );
+
+    const { canonicalizeScreens } = await import("../pipeline/screenCanonicalizer");
 
     // Use long product IDs (8+ chars) so they get replaced with "*" in patterns
     const events: CapturedEvent[] = [
@@ -105,15 +103,18 @@ describe("Screen Canonicalizer", () => {
 
 describe("Instance Segmenter", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    mock.restore();
   });
 
   it("should return empty for no events", async () => {
+    const { segmentInstances } = await import("../pipeline/instanceSegmenter");
     const result = await segmentInstances([], []);
     expect(result.instances).toHaveLength(0);
   });
 
   it("should treat single event as single instance", async () => {
+    const { segmentInstances } = await import("../pipeline/instanceSegmenter");
+
     const events: CapturedEvent[] = [
       {
         timestamp: 1000,
@@ -132,31 +133,37 @@ describe("Instance Segmenter", () => {
   });
 
   it("should segment multiple workflow instances", async () => {
-    mockCallLLMText.mockResolvedValue(JSON.stringify({
-      instances: [
-        {
-          goal: "Search for iPad",
-          startEventIndex: 0,
-          endEventIndex: 2,
-          succeeded: true,
-        },
-        {
-          goal: "Search for iPhone",
-          startEventIndex: 3,
-          endEventIndex: 5,
-          succeeded: true,
-        },
-      ],
-    }));
+    spyOn(llm, "callLLMText").mockResolvedValue(
+      JSON.stringify({
+        instances: [
+          {
+            goal: "Search for iPad",
+            startEventIndex: 0,
+            endEventIndex: 2,
+            succeeded: true,
+          },
+          {
+            goal: "Search for iPhone",
+            startEventIndex: 3,
+            endEventIndex: 5,
+            succeeded: true,
+          },
+        ],
+      })
+    );
 
-    const events: CapturedEvent[] = Array(6).fill(null).map((_, i) => ({
-      timestamp: i * 1000,
-      eventType: "click" as const,
-      url: "https://example.com",
-      screenshotPath: `s${i}.png`,
-      targetTag: "button",
-      screenId: "scr_1",
-    }));
+    const { segmentInstances } = await import("../pipeline/instanceSegmenter");
+
+    const events: CapturedEvent[] = Array(6)
+      .fill(null)
+      .map((_, i) => ({
+        timestamp: i * 1000,
+        eventType: "click" as const,
+        url: "https://example.com",
+        screenshotPath: `s${i}.png`,
+        targetTag: "button",
+        screenId: "scr_1",
+      }));
 
     const result = await segmentInstances(events, []);
 
@@ -170,55 +177,59 @@ describe("Instance Segmenter", () => {
 
 describe("Template Synthesizer", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    mock.restore();
   });
 
   it("should synthesize a template from an instance", async () => {
-    mockCallLLMText.mockResolvedValue(JSON.stringify({
-      template: {
-        name: "Search and Add to Cart",
-        description: "Search for a product and add it to cart",
-        inputs: {
-          search_query: {
-            type: "string",
-            description: "The search term",
-            required: true,
-          },
-        },
-        outputs: {
-          product_name: {
-            type: "string",
-            description: "Name of product added",
-          },
-        },
-        steps: [
-          {
-            stepNumber: 1,
-            screenPattern: "Search Results",
-            actionTemplate: "Enter {search_query} in search box",
-            usesInputs: ["search_query"],
-            extracts: {},
-          },
-          {
-            stepNumber: 2,
-            screenPattern: "Product Detail Page",
-            actionTemplate: "Click Add to Cart",
-            usesInputs: [],
-            extracts: {
-              product_name: { from: "page_content" },
+    spyOn(llm, "callLLMText").mockResolvedValue(
+      JSON.stringify({
+        template: {
+          name: "Search and Add to Cart",
+          description: "Search for a product and add it to cart",
+          inputs: {
+            search_query: {
+              type: "string",
+              description: "The search term",
+              required: true,
             },
           },
-        ],
-      },
-      instanceValues: {
-        inputs: {
-          search_query: "iPad",
+          outputs: {
+            product_name: {
+              type: "string",
+              description: "Name of product added",
+            },
+          },
+          steps: [
+            {
+              stepNumber: 1,
+              screenPattern: "Search Results",
+              actionTemplate: "Enter {search_query} in search box",
+              usesInputs: ["search_query"],
+              extracts: {},
+            },
+            {
+              stepNumber: 2,
+              screenPattern: "Product Detail Page",
+              actionTemplate: "Click Add to Cart",
+              usesInputs: [],
+              extracts: {
+                product_name: { from: "page_content" },
+              },
+            },
+          ],
         },
-        outputs: {
-          product_name: "iPad Pro",
+        instanceValues: {
+          inputs: {
+            search_query: "iPad",
+          },
+          outputs: {
+            product_name: "iPad Pro",
+          },
         },
-      },
-    }));
+      })
+    );
+
+    const { synthesizeTemplate } = await import("../pipeline/templateSynthesizer");
 
     const screens: CanonicalScreen[] = [
       {
@@ -277,4 +288,3 @@ describe("Template Synthesizer", () => {
     expect(result.instance.stepSnapshots).toHaveLength(2);
   });
 });
-

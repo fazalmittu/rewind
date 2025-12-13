@@ -1,12 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
-import {
-  initDb,
-  insertPatient,
-  insertInsurance,
-  insertProvider,
-  clearAllData,
-  closeDb,
-} from "./db";
+import { initDb, insertPatient, insertInsurance, insertProvider, clearAllData, closeDb } from "./db";
 import { Patient, Insurance, Provider } from "./types";
 
 const DUMMY_PATIENTS: Omit<Patient, "id" | "mrn" | "createdAt" | "updatedAt">[] = [
@@ -252,7 +244,7 @@ function generateInsurance(patientId: string, patientName: string): Insurance {
   const now = Date.now();
 
   return {
-    id: uuidv4(),
+    id: crypto.randomUUID(),
     patientId,
     provider,
     policyNumber: `POL${Math.floor(Math.random() * 900000 + 100000)}`,
@@ -268,11 +260,11 @@ function generateInsurance(patientId: string, patientName: string): Insurance {
   };
 }
 
-export async function seedDatabase(): Promise<void> {
+export function seedDatabase(): void {
   console.log("[Seed] Starting database seeding...");
 
   try {
-    await clearAllData();
+    clearAllData();
     console.log("[Seed] Cleared existing data");
 
     // Seed providers first
@@ -280,12 +272,12 @@ export async function seedDatabase(): Promise<void> {
       const now = Date.now();
       const provider: Provider = {
         ...providerData,
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         createdAt: now,
         updatedAt: now,
       };
 
-      await insertProvider(provider);
+      insertProvider(provider);
       console.log(`[Seed] Created provider: Dr. ${provider.firstName} ${provider.lastName} (NPI: ${provider.npi})`);
     }
 
@@ -295,18 +287,18 @@ export async function seedDatabase(): Promise<void> {
       const now = Date.now();
       const patient: Patient = {
         ...patientData,
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         mrn: generateMrn(i),
         createdAt: now,
         updatedAt: now,
       };
 
-      await insertPatient(patient);
+      insertPatient(patient);
       console.log(`[Seed] Created patient: ${patient.firstName} ${patient.lastName} (${patient.mrn})`);
 
       // Add insurance for each patient
       const insurance = generateInsurance(patient.id, `${patient.firstName} ${patient.lastName}`);
-      await insertInsurance(insurance);
+      insertInsurance(insurance);
       console.log(`[Seed] Created insurance for: ${patient.firstName} ${patient.lastName}`);
     }
 
@@ -318,16 +310,9 @@ export async function seedDatabase(): Promise<void> {
 }
 
 // Run if called directly
-if (require.main === module) {
-  initDb()
-    .then(() => seedDatabase())
-    .then(() => closeDb())
-    .then(() => {
-      console.log("[Seed] Done!");
-      process.exit(0);
-    })
-    .catch((err) => {
-      console.error("[Seed] Fatal error:", err);
-      process.exit(1);
-    });
+if (import.meta.main) {
+  initDb();
+  seedDatabase();
+  closeDb();
+  console.log("[Seed] Done!");
 }

@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import fs from "fs";
 import path from "path";
 
 // Lazy initialization of OpenAI client to avoid errors during testing
@@ -63,6 +62,26 @@ export async function callLLMText(prompt: string): Promise<string> {
 }
 
 /**
+ * Read image file and return base64 string using Bun native API
+ */
+async function readImageAsBase64(imagePath: string): Promise<string> {
+  const absolutePath = path.isAbsolute(imagePath)
+    ? imagePath
+    : path.join(process.cwd(), imagePath);
+  const file = Bun.file(absolutePath);
+  const buffer = await file.arrayBuffer();
+  return Buffer.from(buffer).toString("base64");
+}
+
+/**
+ * Check if file exists using Bun native API
+ */
+async function fileExists(filePath: string): Promise<boolean> {
+  const file = Bun.file(filePath);
+  return file.exists();
+}
+
+/**
  * Call LLM with image + text prompt
  */
 export async function callLLMWithImage(
@@ -70,13 +89,8 @@ export async function callLLMWithImage(
   imagePath: string
 ): Promise<string> {
   const client = getOpenAIClient();
-  
-  // Read image and convert to base64
-  const absolutePath = path.isAbsolute(imagePath)
-    ? imagePath
-    : path.join(process.cwd(), imagePath);
-  const imageBuffer = fs.readFileSync(absolutePath);
-  const base64Image = imageBuffer.toString("base64");
+
+  const base64Image = await readImageAsBase64(imagePath);
   const mimeType = "image/png";
 
   const model = getModel();
@@ -124,10 +138,9 @@ export async function callLLMWithTwoImages(
     const absolutePath1 = path.isAbsolute(imagePath1)
       ? imagePath1
       : path.join(process.cwd(), imagePath1);
-    
-    if (fs.existsSync(absolutePath1)) {
-      const imageBuffer1 = fs.readFileSync(absolutePath1);
-      const base64Image1 = imageBuffer1.toString("base64");
+
+    if (await fileExists(absolutePath1)) {
+      const base64Image1 = await readImageAsBase64(imagePath1);
       content.push({
         type: "image_url",
         image_url: {
@@ -138,11 +151,7 @@ export async function callLLMWithTwoImages(
   }
 
   // Add second image (current screenshot)
-  const absolutePath2 = path.isAbsolute(imagePath2)
-    ? imagePath2
-    : path.join(process.cwd(), imagePath2);
-  const imageBuffer2 = fs.readFileSync(absolutePath2);
-  const base64Image2 = imageBuffer2.toString("base64");
+  const base64Image2 = await readImageAsBase64(imagePath2);
   content.push({
     type: "image_url",
     image_url: {

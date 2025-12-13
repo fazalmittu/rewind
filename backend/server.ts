@@ -1,9 +1,6 @@
 import express, { Express } from "express";
 import cors from "cors";
-import fs from "fs";
 import path from "path";
-import livereload from "livereload";
-import connectLivereload from "connect-livereload";
 import {
   clearAllData,
   getTemplatesWithInstances,
@@ -20,23 +17,20 @@ export function createApp(): Express {
   app.use(cors());
   app.use(express.json({ limit: "50mb" }));
 
-  // Live reload in development (not during tests)
-  // Disabled due to port conflict issues - manually refresh browser
-  // if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
-  //   const liveReloadServer = livereload.createServer();
-  //   liveReloadServer.watch(path.join(__dirname, "..", "frontend"));
-  //   app.use(connectLivereload());
-  //   console.log("[LiveReload] Watching frontend/ for changes");
-  // }
-
   // Serve frontend static files
-  app.use("/", express.static(path.join(__dirname, "..", "frontend")));
+  app.use("/", express.static(path.join(import.meta.dir, "..", "frontend")));
 
   // Serve assets (logo, etc.)
-  app.use("/assets", express.static(path.join(__dirname, "..", "assets")));
+  app.use(
+    "/assets",
+    express.static(path.join(import.meta.dir, "..", "assets"))
+  );
 
   // Serve screenshots
-  app.use("/screenshots", express.static(path.join(__dirname, "..", "storage", "screenshots")));
+  app.use(
+    "/screenshots",
+    express.static(path.join(import.meta.dir, "..", "storage", "screenshots"))
+  );
 
   // Health check
   app.get("/health", (_, res) => {
@@ -78,20 +72,28 @@ export function createApp(): Express {
         res.status(400).json({ error: "Missing payload or screenshot" });
         return;
       }
-      
-      console.log(`[Ingest] Event: ${payload.eventType} from session ${payload.sessionId}`);
 
-      // Save screenshot
-      const screenshotsDir = path.join(__dirname, "..", "storage", "screenshots");
-      if (!fs.existsSync(screenshotsDir)) {
-        fs.mkdirSync(screenshotsDir, { recursive: true });
-      }
+      console.log(
+        `[Ingest] Event: ${payload.eventType} from session ${payload.sessionId}`
+      );
 
+      // Save screenshot using Bun native API
+      const screenshotsDir = path.join(
+        import.meta.dir,
+        "..",
+        "storage",
+        "screenshots"
+      );
       const fileName = `${payload.timestamp}.png`;
       const screenshotPath = path.join(screenshotsDir, fileName);
       const relativeScreenshotPath = `storage/screenshots/${fileName}`;
+
+      // Ensure directory exists
+      await Bun.write(path.join(screenshotsDir, ".keep"), "");
+
+      // Write screenshot (base64 decode)
       const base64Data = screenshot.replace(/^data:image\/png;base64,/, "");
-      fs.writeFileSync(screenshotPath, base64Data, "base64");
+      await Bun.write(screenshotPath, Buffer.from(base64Data, "base64"));
 
       // Create captured event
       const event: CapturedEvent = {
@@ -147,7 +149,9 @@ export function createApp(): Express {
         return;
       }
 
-      console.log(`[Finalize] Processing session ${sessionId} with ${session.events.length} events`);
+      console.log(
+        `[Finalize] Processing session ${sessionId} with ${session.events.length} events`
+      );
 
       // Run the finalization pipeline
       const result = await runFinalizationPipeline(sessionId, session.events);
@@ -169,9 +173,9 @@ export function createApp(): Express {
   });
 
   // Get all templates with their instances
-  app.get("/templates", async (_, res) => {
+  app.get("/templates", (_, res) => {
     try {
-      const templates = await getTemplatesWithInstances();
+      const templates = getTemplatesWithInstances();
       res.json(templates);
     } catch (error) {
       console.error("Get templates error:", error);
@@ -180,9 +184,9 @@ export function createApp(): Express {
   });
 
   // Get all canonical screens
-  app.get("/screens", async (_, res) => {
+  app.get("/screens", (_, res) => {
     try {
-      const screens = await getAllCanonicalScreens();
+      const screens = getAllCanonicalScreens();
       res.json(screens);
     } catch (error) {
       console.error("Get screens error:", error);
@@ -191,9 +195,9 @@ export function createApp(): Express {
   });
 
   // Reset database - clears all data
-  app.post("/reset", async (_, res) => {
+  app.post("/reset", (_, res) => {
     try {
-      await clearAllData();
+      clearAllData();
       sessionStore.clear();
       res.json({ ok: true, message: "All data cleared" });
     } catch (error) {
