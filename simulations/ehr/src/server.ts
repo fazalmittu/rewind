@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { v4 as uuidv4 } from "uuid";
 import {
   initDb,
   getAllPatients,
@@ -36,17 +35,17 @@ const PORT = 3001;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "..", "public")));
+app.use(express.static(path.join(import.meta.dir, "..", "public")));
 
 // ============================================
 // PATIENT ROUTES
 // ============================================
 
 // Get all patients
-app.get("/api/patients", async (req, res) => {
+app.get("/api/patients", (req, res) => {
   try {
     const search = req.query.search as string;
-    const patients = search ? await searchPatients(search) : await getAllPatients();
+    const patients = search ? searchPatients(search) : getAllPatients();
     res.json(patients);
   } catch (error) {
     console.error("Error fetching patients:", error);
@@ -55,9 +54,9 @@ app.get("/api/patients", async (req, res) => {
 });
 
 // Get next MRN
-app.get("/api/patients/next-mrn", async (req, res) => {
+app.get("/api/patients/next-mrn", (req, res) => {
   try {
-    const mrn = await getNextMrn();
+    const mrn = getNextMrn();
     res.json({ mrn });
   } catch (error) {
     console.error("Error getting next MRN:", error);
@@ -66,9 +65,9 @@ app.get("/api/patients/next-mrn", async (req, res) => {
 });
 
 // Get patient by ID
-app.get("/api/patients/:id", async (req, res) => {
+app.get("/api/patients/:id", (req, res) => {
   try {
-    const patient = await getPatientById(req.params.id);
+    const patient = getPatientById(req.params.id);
     if (!patient) {
       return res.status(404).json({ error: "Patient not found" });
     }
@@ -80,18 +79,18 @@ app.get("/api/patients/:id", async (req, res) => {
 });
 
 // Create new patient
-app.post("/api/patients", async (req, res) => {
+app.post("/api/patients", (req, res) => {
   try {
     const now = Date.now();
-    const mrn = await getNextMrn();
+    const mrn = getNextMrn();
     const patient: Patient = {
       ...req.body,
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       mrn,
       createdAt: now,
       updatedAt: now,
     };
-    await insertPatient(patient);
+    insertPatient(patient);
     console.log(`[EHR] Created patient: ${patient.firstName} ${patient.lastName} (${patient.mrn})`);
     res.status(201).json(patient);
   } catch (error) {
@@ -101,9 +100,9 @@ app.post("/api/patients", async (req, res) => {
 });
 
 // Update patient
-app.put("/api/patients/:id", async (req, res) => {
+app.put("/api/patients/:id", (req, res) => {
   try {
-    const existing = await getPatientById(req.params.id);
+    const existing = getPatientById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Patient not found" });
     }
@@ -114,7 +113,7 @@ app.put("/api/patients/:id", async (req, res) => {
       mrn: existing.mrn, // MRN cannot be changed
       updatedAt: Date.now(),
     };
-    await updatePatient(patient);
+    updatePatient(patient);
     console.log(`[EHR] Updated patient: ${patient.firstName} ${patient.lastName}`);
     res.json(patient);
   } catch (error) {
@@ -124,13 +123,13 @@ app.put("/api/patients/:id", async (req, res) => {
 });
 
 // Delete patient
-app.delete("/api/patients/:id", async (req, res) => {
+app.delete("/api/patients/:id", (req, res) => {
   try {
-    const existing = await getPatientById(req.params.id);
+    const existing = getPatientById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Patient not found" });
     }
-    await deletePatient(req.params.id);
+    deletePatient(req.params.id);
     console.log(`[EHR] Deleted patient: ${existing.firstName} ${existing.lastName}`);
     res.json({ success: true });
   } catch (error) {
@@ -144,9 +143,9 @@ app.delete("/api/patients/:id", async (req, res) => {
 // ============================================
 
 // Get insurance for a patient
-app.get("/api/patients/:patientId/insurance", async (req, res) => {
+app.get("/api/patients/:patientId/insurance", (req, res) => {
   try {
-    const insurance = await getInsuranceByPatientId(req.params.patientId);
+    const insurance = getInsuranceByPatientId(req.params.patientId);
     res.json(insurance);
   } catch (error) {
     console.error("Error fetching insurance:", error);
@@ -155,9 +154,9 @@ app.get("/api/patients/:patientId/insurance", async (req, res) => {
 });
 
 // Get insurance by ID
-app.get("/api/insurance/:id", async (req, res) => {
+app.get("/api/insurance/:id", (req, res) => {
   try {
-    const insurance = await getInsuranceById(req.params.id);
+    const insurance = getInsuranceById(req.params.id);
     if (!insurance) {
       return res.status(404).json({ error: "Insurance not found" });
     }
@@ -169,21 +168,21 @@ app.get("/api/insurance/:id", async (req, res) => {
 });
 
 // Create new insurance
-app.post("/api/patients/:patientId/insurance", async (req, res) => {
+app.post("/api/patients/:patientId/insurance", (req, res) => {
   try {
-    const patient = await getPatientById(req.params.patientId);
+    const patient = getPatientById(req.params.patientId);
     if (!patient) {
       return res.status(404).json({ error: "Patient not found" });
     }
     const now = Date.now();
     const insurance: Insurance = {
       ...req.body,
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       patientId: req.params.patientId,
       createdAt: now,
       updatedAt: now,
     };
-    await insertInsurance(insurance);
+    insertInsurance(insurance);
     console.log(`[EHR] Created insurance for patient: ${patient.firstName} ${patient.lastName}`);
     res.status(201).json(insurance);
   } catch (error) {
@@ -193,9 +192,9 @@ app.post("/api/patients/:patientId/insurance", async (req, res) => {
 });
 
 // Update insurance
-app.put("/api/insurance/:id", async (req, res) => {
+app.put("/api/insurance/:id", (req, res) => {
   try {
-    const existing = await getInsuranceById(req.params.id);
+    const existing = getInsuranceById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Insurance not found" });
     }
@@ -205,7 +204,7 @@ app.put("/api/insurance/:id", async (req, res) => {
       id: req.params.id,
       updatedAt: Date.now(),
     };
-    await updateInsurance(insurance);
+    updateInsurance(insurance);
     console.log(`[EHR] Updated insurance: ${insurance.id}`);
     res.json(insurance);
   } catch (error) {
@@ -215,13 +214,13 @@ app.put("/api/insurance/:id", async (req, res) => {
 });
 
 // Delete insurance
-app.delete("/api/insurance/:id", async (req, res) => {
+app.delete("/api/insurance/:id", (req, res) => {
   try {
-    const existing = await getInsuranceById(req.params.id);
+    const existing = getInsuranceById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Insurance not found" });
     }
-    await deleteInsurance(req.params.id);
+    deleteInsurance(req.params.id);
     console.log(`[EHR] Deleted insurance: ${existing.id}`);
     res.json({ success: true });
   } catch (error) {
@@ -235,10 +234,10 @@ app.delete("/api/insurance/:id", async (req, res) => {
 // ============================================
 
 // Get all providers
-app.get("/api/providers", async (req, res) => {
+app.get("/api/providers", (req, res) => {
   try {
     const search = req.query.search as string;
-    const providers = search ? await searchProviders(search) : await getAllProviders();
+    const providers = search ? searchProviders(search) : getAllProviders();
     res.json(providers);
   } catch (error) {
     console.error("Error fetching providers:", error);
@@ -247,9 +246,9 @@ app.get("/api/providers", async (req, res) => {
 });
 
 // Get provider by ID
-app.get("/api/providers/:id", async (req, res) => {
+app.get("/api/providers/:id", (req, res) => {
   try {
-    const provider = await getProviderById(req.params.id);
+    const provider = getProviderById(req.params.id);
     if (!provider) {
       return res.status(404).json({ error: "Provider not found" });
     }
@@ -261,21 +260,21 @@ app.get("/api/providers/:id", async (req, res) => {
 });
 
 // Create new provider
-app.post("/api/providers", async (req, res) => {
+app.post("/api/providers", (req, res) => {
   try {
     const now = Date.now();
     const provider: Provider = {
       ...req.body,
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       createdAt: now,
       updatedAt: now,
     };
-    await insertProvider(provider);
+    insertProvider(provider);
     console.log(`[EHR] Created provider: Dr. ${provider.firstName} ${provider.lastName} (NPI: ${provider.npi})`);
     res.status(201).json(provider);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating provider:", error);
-    if (error?.code === "SQLITE_CONSTRAINT") {
+    if (error && typeof error === "object" && "code" in error && error.code === "SQLITE_CONSTRAINT") {
       res.status(400).json({ error: "A provider with this NPI already exists" });
     } else {
       res.status(500).json({ error: "Failed to create provider" });
@@ -284,9 +283,9 @@ app.post("/api/providers", async (req, res) => {
 });
 
 // Update provider
-app.put("/api/providers/:id", async (req, res) => {
+app.put("/api/providers/:id", (req, res) => {
   try {
-    const existing = await getProviderById(req.params.id);
+    const existing = getProviderById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Provider not found" });
     }
@@ -296,7 +295,7 @@ app.put("/api/providers/:id", async (req, res) => {
       id: req.params.id,
       updatedAt: Date.now(),
     };
-    await updateProvider(provider);
+    updateProvider(provider);
     console.log(`[EHR] Updated provider: Dr. ${provider.firstName} ${provider.lastName}`);
     res.json(provider);
   } catch (error) {
@@ -306,13 +305,13 @@ app.put("/api/providers/:id", async (req, res) => {
 });
 
 // Delete provider
-app.delete("/api/providers/:id", async (req, res) => {
+app.delete("/api/providers/:id", (req, res) => {
   try {
-    const existing = await getProviderById(req.params.id);
+    const existing = getProviderById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Provider not found" });
     }
-    await deleteProvider(req.params.id);
+    deleteProvider(req.params.id);
     console.log(`[EHR] Deleted provider: Dr. ${existing.firstName} ${existing.lastName}`);
     res.json({ success: true });
   } catch (error) {
@@ -326,9 +325,9 @@ app.delete("/api/providers/:id", async (req, res) => {
 // ============================================
 
 // Get drug referrals for a patient
-app.get("/api/patients/:patientId/referrals", async (req, res) => {
+app.get("/api/patients/:patientId/referrals", (req, res) => {
   try {
-    const referrals = await getDrugReferralsByPatientId(req.params.patientId);
+    const referrals = getDrugReferralsByPatientId(req.params.patientId);
     res.json(referrals);
   } catch (error) {
     console.error("Error fetching referrals:", error);
@@ -337,9 +336,9 @@ app.get("/api/patients/:patientId/referrals", async (req, res) => {
 });
 
 // Get drug referral by ID
-app.get("/api/referrals/:id", async (req, res) => {
+app.get("/api/referrals/:id", (req, res) => {
   try {
-    const referral = await getDrugReferralById(req.params.id);
+    const referral = getDrugReferralById(req.params.id);
     if (!referral) {
       return res.status(404).json({ error: "Referral not found" });
     }
@@ -351,27 +350,29 @@ app.get("/api/referrals/:id", async (req, res) => {
 });
 
 // Create new drug referral
-app.post("/api/patients/:patientId/referrals", async (req, res) => {
+app.post("/api/patients/:patientId/referrals", (req, res) => {
   try {
-    const patient = await getPatientById(req.params.patientId);
+    const patient = getPatientById(req.params.patientId);
     if (!patient) {
       return res.status(404).json({ error: "Patient not found" });
     }
-    const provider = await getProviderById(req.body.providerId);
+    const provider = getProviderById(req.body.providerId);
     if (!provider) {
       return res.status(404).json({ error: "Provider not found" });
     }
     const now = Date.now();
     const referral: DrugReferral = {
       ...req.body,
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       patientId: req.params.patientId,
       status: req.body.status || "pending",
       createdAt: now,
       updatedAt: now,
     };
-    await insertDrugReferral(referral);
-    console.log(`[EHR] Created drug referral for patient: ${patient.firstName} ${patient.lastName} - ${referral.drugName}`);
+    insertDrugReferral(referral);
+    console.log(
+      `[EHR] Created drug referral for patient: ${patient.firstName} ${patient.lastName} - ${referral.drugName}`
+    );
     res.status(201).json(referral);
   } catch (error) {
     console.error("Error creating referral:", error);
@@ -380,9 +381,9 @@ app.post("/api/patients/:patientId/referrals", async (req, res) => {
 });
 
 // Update drug referral
-app.put("/api/referrals/:id", async (req, res) => {
+app.put("/api/referrals/:id", (req, res) => {
   try {
-    const existing = await getDrugReferralById(req.params.id);
+    const existing = getDrugReferralById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Referral not found" });
     }
@@ -392,7 +393,7 @@ app.put("/api/referrals/:id", async (req, res) => {
       id: req.params.id,
       updatedAt: Date.now(),
     };
-    await updateDrugReferral(referral);
+    updateDrugReferral(referral);
     console.log(`[EHR] Updated drug referral: ${referral.id}`);
     res.json(referral);
   } catch (error) {
@@ -402,13 +403,13 @@ app.put("/api/referrals/:id", async (req, res) => {
 });
 
 // Delete drug referral
-app.delete("/api/referrals/:id", async (req, res) => {
+app.delete("/api/referrals/:id", (req, res) => {
   try {
-    const existing = await getDrugReferralById(req.params.id);
+    const existing = getDrugReferralById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Referral not found" });
     }
-    await deleteDrugReferral(req.params.id);
+    deleteDrugReferral(req.params.id);
     console.log(`[EHR] Deleted drug referral: ${existing.id}`);
     res.json({ success: true });
   } catch (error) {
@@ -422,9 +423,9 @@ app.delete("/api/referrals/:id", async (req, res) => {
 // ============================================
 
 // Reseed database
-app.post("/api/admin/reseed", async (req, res) => {
+app.post("/api/admin/reseed", (req, res) => {
   try {
-    await seedDatabase();
+    seedDatabase();
     res.json({ success: true, message: "Database reseeded" });
   } catch (error) {
     console.error("Error reseeding database:", error);
@@ -436,16 +437,16 @@ app.post("/api/admin/reseed", async (req, res) => {
 // START SERVER
 // ============================================
 
-async function start() {
+function start() {
   try {
-    await initDb();
+    initDb();
     console.log("[EHR] Database initialized");
 
     // Only seed if database is empty
-    const patients = await getAllPatients();
+    const patients = getAllPatients();
     if (patients.length === 0) {
       console.log("[EHR] Database empty, seeding with sample data...");
-      await seedDatabase();
+      seedDatabase();
     } else {
       console.log(`[EHR] Database has ${patients.length} patients, skipping seed`);
     }

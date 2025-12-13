@@ -1,40 +1,93 @@
-import request from "supertest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { createApp } from "../server";
 import { initDb, closeDb, clearAllData, insertWorkflowTemplate, insertWorkflowInstance } from "../db";
 import { sessionStore } from "../sessionStore";
 import fs from "fs";
 import path from "path";
 
-const TEST_DB_PATH = path.join(__dirname, "server-test.db");
-const TEST_SCREENSHOTS_DIR = path.join(__dirname, "..", "..", "storage", "screenshots");
+const TEST_DB_PATH = path.join(import.meta.dir, "server-test.db");
+const TEST_SCREENSHOTS_DIR = path.join(import.meta.dir, "..", "..", "storage", "screenshots");
 
 let app: ReturnType<typeof createApp>;
 
-beforeAll(async () => {
-  await initDb(TEST_DB_PATH);
+beforeAll(() => {
+  initDb(TEST_DB_PATH);
   app = createApp();
-  
+
   // Ensure screenshots directory exists
   if (!fs.existsSync(TEST_SCREENSHOTS_DIR)) {
     fs.mkdirSync(TEST_SCREENSHOTS_DIR, { recursive: true });
   }
 });
 
-afterAll(async () => {
-  await closeDb();
+afterAll(() => {
+  closeDb();
   if (fs.existsSync(TEST_DB_PATH)) {
     fs.unlinkSync(TEST_DB_PATH);
   }
 });
 
-beforeEach(async () => {
-  await clearAllData();
+beforeEach(() => {
+  clearAllData();
   sessionStore.clear();
 });
 
+// Helper function for making requests
+async function request(method: string, path: string, body?: unknown) {
+  const port = 0; // Use random available port
+  const server = app.listen(port);
+  const address = server.address();
+  const actualPort = typeof address === "object" && address ? address.port : 3000;
+
+  try {
+    const url = `http://localhost:${actualPort}${path}`;
+    const options: RequestInit = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+
+    const res = await fetch(url);
+    const json = method !== "DELETE" ? await res.json() : null;
+    return { status: res.status, body: json };
+  } finally {
+    server.close();
+  }
+}
+
+async function makeRequest(method: string, urlPath: string, body?: unknown) {
+  const port = 0;
+  const server = app.listen(port);
+  const address = server.address();
+  const actualPort = typeof address === "object" && address ? address.port : 3000;
+
+  try {
+    const url = `http://localhost:${actualPort}${urlPath}`;
+    const options: RequestInit = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+
+    const res = await fetch(url, options);
+    const json = await res.json().catch(() => null);
+    return { status: res.status, body: json };
+  } finally {
+    server.close();
+  }
+}
+
 describe("GET /health", () => {
   it("should return ok status", async () => {
-    const res = await request(app).get("/health");
+    const res = await makeRequest("GET", "/health");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
   });
@@ -42,7 +95,7 @@ describe("GET /health", () => {
 
 describe("GET /session-stats", () => {
   it("should return empty stats initially", async () => {
-    const res = await request(app).get("/session-stats");
+    const res = await makeRequest("GET", "/session-stats");
     expect(res.status).toBe(200);
     expect(res.body.activeSessions).toBe(0);
     expect(res.body.sessions).toHaveLength(0);
@@ -52,23 +105,22 @@ describe("GET /session-stats", () => {
 describe("POST /ingest", () => {
   it("should ingest an event", async () => {
     // Create a minimal valid base64 PNG (1x1 transparent pixel)
-    const minimalPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const minimalPng =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-    const res = await request(app)
-      .post("/ingest")
-      .send({
-        payload: {
-          sessionId: "test-session-123",
-          timestamp: Date.now(),
-          url: "https://example.com/test",
-          eventType: "click",
-          targetTag: "button",
-          targetText: "Add to Cart",
-          clickX: 100,
-          clickY: 200,
-        },
-        screenshot: minimalPng,
-      });
+    const res = await makeRequest("POST", "/ingest", {
+      payload: {
+        sessionId: "test-session-123",
+        timestamp: Date.now(),
+        url: "https://example.com/test",
+        eventType: "click",
+        targetTag: "button",
+        targetText: "Add to Cart",
+        clickX: 100,
+        clickY: 200,
+      },
+      screenshot: minimalPng,
+    });
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
@@ -77,41 +129,40 @@ describe("POST /ingest", () => {
   });
 
   it("should ingest input events", async () => {
-    const minimalPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const minimalPng =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-    const res = await request(app)
-      .post("/ingest")
-      .send({
-        payload: {
-          sessionId: "test-session-456",
-          timestamp: Date.now(),
-          url: "https://example.com/search",
-          eventType: "input",
-          targetTag: "input",
-          inputValue: "iPad Pro",
-          inputName: "search",
-          inputLabel: "Search",
-          inputType: "text",
-        },
-        screenshot: minimalPng,
-      });
+    const res = await makeRequest("POST", "/ingest", {
+      payload: {
+        sessionId: "test-session-456",
+        timestamp: Date.now(),
+        url: "https://example.com/search",
+        eventType: "input",
+        targetTag: "input",
+        inputValue: "iPad Pro",
+        inputName: "search",
+        inputLabel: "Search",
+        inputType: "text",
+      },
+      screenshot: minimalPng,
+    });
 
     expect(res.status).toBe(200);
     expect(res.body.eventType).toBe("input");
   });
 
   it("should reject missing payload", async () => {
-    const res = await request(app)
-      .post("/ingest")
-      .send({ screenshot: "data:image/png;base64,abc" });
+    const res = await makeRequest("POST", "/ingest", {
+      screenshot: "data:image/png;base64,abc",
+    });
 
     expect(res.status).toBe(400);
   });
 
   it("should reject missing screenshot", async () => {
-    const res = await request(app)
-      .post("/ingest")
-      .send({ payload: { sessionId: "test" } });
+    const res = await makeRequest("POST", "/ingest", {
+      payload: { sessionId: "test" },
+    });
 
     expect(res.status).toBe(400);
   });
@@ -119,27 +170,26 @@ describe("POST /ingest", () => {
 
 describe("GET /session/:sessionId", () => {
   it("should return 404 for non-existent session", async () => {
-    const res = await request(app).get("/session/non-existent");
+    const res = await makeRequest("GET", "/session/non-existent");
     expect(res.status).toBe(404);
   });
 
   it("should return session info for existing session", async () => {
     // First ingest an event to create a session
-    const minimalPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-    await request(app)
-      .post("/ingest")
-      .send({
-        payload: {
-          sessionId: "session-to-get",
-          timestamp: Date.now(),
-          url: "https://example.com",
-          eventType: "click",
-          targetTag: "button",
-        },
-        screenshot: minimalPng,
-      });
+    const minimalPng =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    await makeRequest("POST", "/ingest", {
+      payload: {
+        sessionId: "session-to-get",
+        timestamp: Date.now(),
+        url: "https://example.com",
+        eventType: "click",
+        targetTag: "button",
+      },
+      screenshot: minimalPng,
+    });
 
-    const res = await request(app).get("/session/session-to-get");
+    const res = await makeRequest("GET", "/session/session-to-get");
     expect(res.status).toBe(200);
     expect(res.body.sessionId).toBe("session-to-get");
     expect(res.body.eventCount).toBe(1);
@@ -148,7 +198,7 @@ describe("GET /session/:sessionId", () => {
 
 describe("GET /templates", () => {
   it("should return empty array when no templates", async () => {
-    const res = await request(app).get("/templates");
+    const res = await makeRequest("GET", "/templates");
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(0);
   });
@@ -164,9 +214,9 @@ describe("GET /templates", () => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    await insertWorkflowTemplate(template);
+    insertWorkflowTemplate(template);
 
-    await insertWorkflowInstance({
+    insertWorkflowInstance({
       id: "inst_test",
       templateId: template.id,
       sessionId: "sess_test",
@@ -176,7 +226,7 @@ describe("GET /templates", () => {
       createdAt: Date.now(),
     });
 
-    const res = await request(app).get("/templates");
+    const res = await makeRequest("GET", "/templates");
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
     expect(res.body[0].name).toBe("Test Template");
@@ -186,9 +236,9 @@ describe("GET /templates", () => {
 
 describe("POST /finalize-session", () => {
   it("should return ok for empty session", async () => {
-    const res = await request(app)
-      .post("/finalize-session")
-      .send({ sessionId: "empty-session" });
+    const res = await makeRequest("POST", "/finalize-session", {
+      sessionId: "empty-session",
+    });
 
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
@@ -196,9 +246,7 @@ describe("POST /finalize-session", () => {
   });
 
   it("should reject missing sessionId", async () => {
-    const res = await request(app)
-      .post("/finalize-session")
-      .send({});
+    const res = await makeRequest("POST", "/finalize-session", {});
 
     expect(res.status).toBe(400);
   });
@@ -207,7 +255,7 @@ describe("POST /finalize-session", () => {
 describe("POST /reset", () => {
   it("should clear all data", async () => {
     // Insert some data first
-    await insertWorkflowTemplate({
+    insertWorkflowTemplate({
       id: "tmpl_to_delete",
       name: "To Delete",
       description: "Will be deleted",
@@ -218,23 +266,22 @@ describe("POST /reset", () => {
       updatedAt: Date.now(),
     });
 
-    const beforeReset = await request(app).get("/templates");
+    const beforeReset = await makeRequest("GET", "/templates");
     expect(beforeReset.body).toHaveLength(1);
 
-    const res = await request(app).post("/reset");
+    const res = await makeRequest("POST", "/reset");
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
 
-    const afterReset = await request(app).get("/templates");
+    const afterReset = await makeRequest("GET", "/templates");
     expect(afterReset.body).toHaveLength(0);
   });
 });
 
 describe("GET /screens", () => {
   it("should return empty array when no screens", async () => {
-    const res = await request(app).get("/screens");
+    const res = await makeRequest("GET", "/screens");
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(0);
   });
 });
-
